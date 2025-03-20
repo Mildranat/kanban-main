@@ -1,0 +1,494 @@
+{% extends "base.html" %}
+
+{% block title %}
+Канбан-доска
+{% endblock %}
+
+{% block content %}
+
+<body class="antialiased sans-serif bg-gray-300">
+  <div class="flex">
+    <!-- Боковое меню -->
+    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6" x-data="{ workspaces: {{ workspaces|safe }} }">
+
+      <h2 class="text-xl font-bold">Меню</h2>
+      <ul class="mt-4">
+        <li class="mb-2">
+          <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
+        </li>
+        <li class="mb-2">
+          <a href="/tasks" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
+        </li>
+        <li class="mb-2">
+          <a href="/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
+        </li>
+      </ul>
+      
+      <h2 class="text-xl font-bold mt-6">Пространства</h2>
+      <ul class="mt-4">
+        <template x-for="workspace in workspaces" :key="workspace.id">
+          <li class="mb-2">
+            <div @click="loadProjects(workspace.id)" class="block px-4 py-2 rounded-lg hover:bg-gray-700 cursor-pointer">
+              <span x-text="workspace.name"></span>
+            </div>
+            <ul class="ml-4" x-show="selectedWorkspace === workspace.id">
+              <template x-for="project in workspace.projects" :key="project.id">
+                <li class="mb-2">
+                  <div @click="loadBoard(project.id)" class="block px-4 py-2 rounded-lg hover:bg-gray-600 cursor-pointer">
+                    <span x-text="project.name"></span>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </li>
+        </template>
+      </ul>
+    </nav>
+
+    <!-- Основной контент -->
+<div x-data="board()" x-init="init()" x-cloak class="flex-1 flex flex-col min-h-screen border-t-8" :class="`border-${colorSelected.value}-700`">
+      <div class="flex-1">
+        <!-- Хедер -->
+        <div class="bg-cover bg-center bg-no-repeat" :class="`bg-${colorSelected.value}-900`" :style="`background-image: url(${bannerImage})`">        
+          <div class="container mx-auto px-4 pt-4 md:pt-10 pb-40"></div>
+        </div>
+        <!-- конец хедера -->
+    
+        <div class="container mx-auto px-4 py-4 -mt-40">
+          {% include 'settings.html' %}
+          <!-- Главная -->
+          <div x-show.immediate="showSettingsPage == false">
+            <div x-show.transition="showSettingsPage == false">
+              <!-- Приветствие -->
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <h1 class="text-xl md:text-2xl text-gray-300 font-semibold">
+                    {% now "H" as current_time %}
+                    {% if current_time|add:"0" < 12 %}
+                     Доброе утро, {{ request.user.username }}
+                    {% elif current_time|add:"0" > 17 %}
+                     Добрый вечер, {{ request.user.username }}
+                    {% else %}
+                     Добрый день, {{ request.user.username }}
+                    {% endif %}
+                  </h1>
+                  <div class="text-sm" :class="`text-${colorSelected.value}-400`">{% now 'SHORT_DATE_FORMAT' %}</div>
+                </div>
+                <div>
+                  <a @click.prevent="showSettingsPage = !showSettingsPage" href="#" class="rounded-lg px-3 py-2 font-medium inline-flex" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
+                    <i class="uil uil-setting text-left mr-1"></i> Настройки</a>
+                  <a href="/logout" class="rounded-lg px-3 py-2 font-medium inline-flex items-center" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
+                    <i class="uil uil-sign-out-alt mr-1"></i>Выход</a>
+                </div>
+              </div>
+              <!-- Конец блока Приветствие -->
+    
+              <!-- Канбан-доска -->
+              <div class="py-4 md:py-8">
+                <form id="task-form">
+                  {% csrf_token %}
+                </form>
+                <div class="flex -mx-4 block overflow-x-auto pb-2">
+                  <template x-for="(column, columnIndex) in columns" :key="columnIndex">
+                    <div class="w-1/2 md:w-1/4 px-4 flex-shrink-0">
+                      <div class="bg-gray-100 pb-4 rounded-lg shadow overflow-y-auto overflow-x-hidden border-t-8" style="min-height: 100px" :class="{
+                          'border-red-500': columnIndex === 0,
+                          'border-yellow-500': columnIndex === 1,
+                          'border-blue-500': columnIndex === 2,
+                          'border-green-500': columnIndex === 3,
+                        }">
+                        <div class="flex justify-between items-center px-4 py-2 bg-gray-100 sticky top-0">
+                          <!-- Редактируемое название колонки -->
+                          <div class="w-3/4">
+                            <!-- Отображение названия колонки, когда не редактируется -->
+                            <div x-show="editingColumnIndex !== columnIndex" 
+                                @click="startEditColumn(columnIndex)" 
+                                class="font-medium text-gray-800 cursor-pointer hover:bg-gray-200 px-2 py-1 rounded">
+                              <span x-text="column.name"></span>
+                            </div>
+                            
+                            <!-- Поле ввода для редактирования -->
+                            <div x-show="editingColumnIndex === columnIndex" class="w-full">
+                              <input 
+                                type="text" 
+                                x-model="columns[columnIndex].name"
+                                @blur="saveColumnTitle(columnIndex)" 
+                                @keydown.enter="saveColumnTitle(columnIndex)"
+                                class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500 font-medium"
+                                :id="'columnInput' + columnIndex"
+                              >                          
+                            </div>
+                          </div>
+                          <!-- Кнопка добавления задачи -->
+                          <button @click="showNewTaskInput(column.id)" class="inline-flex items-center text-sm font-medium" :class="`text-${colorSelected.value}-500 hover:text-${colorSelected.value}-600`">
+                            <i class="uil uil-plus mr-1"></i>Добавить
+                          </button>
+                        </div>
+                        <div class="px-4">
+                          <div @dragover="onDragOver(event)" 
+                          @drop="onDrop(event, column.id)" 
+                          @dragenter="onDragEnter(event)" 
+                          @dragleave="onDragLeave(event)" 
+                          class="pt-2 pb-20 rounded-lg">
+                       <!-- Отображение существующих задач -->
+                       <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="taskIndex">
+                         <div :id="t.id" 
+                              class="bg-white rounded-lg shadow mb-3" 
+                              draggable="true" 
+                              @dragstart="onDragStart($event, t.id)">
+                           <div class="flex justify-between items-center p-2">
+                             <div x-text="t.name" class="text-gray-800"></div>
+                             <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">
+                               × <!-- Символ крестика -->
+                             </button>
+                           </div>
+                           <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
+                         </div>
+                       </template>
+           
+                            <!-- Поле ввода для новой задачи -->
+                            <div x-show="newTaskColumn === column.id" class="bg-white rounded-lg shadow mb-3 p-2">
+                              <input
+                                type="text"
+                                x-model="newTaskName"
+                                placeholder="Новая задача..."
+                                @keydown.enter="addTask(column.id)"
+                                @keydown.escape="cancelNewTask()"
+                                class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"
+                                x-ref="'newTaskInput-' + column.id"
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <!-- конец Канбан-доски -->
+            </div>
+          </div>
+          <!-- конец Главной -->
+        </div>
+      </div>
+    </div>
+  </div>
+<script>
+const csrftoken = document.querySelector('#task-form > input').value;
+const api_client = axios.create({
+    baseURL: '/api',
+    headers: { 'X-CSRFToken': csrftoken },
+});
+function board() {
+  return {
+    showSettingsPage: false, // Добавлено
+    bannerImage: '', // Добавлено
+    colorSelected: { label: '#3182ce', value: 'blue' }, // Добавлено
+    colors: [ // Добавлено
+      { label: '#3182ce', value: 'blue' },
+      { label: '#38a169', value: 'green' },
+      { label: '#967bb6', value: 'purple' },
+      { label: '#e53e3e', value: 'red' },
+      { label: '#ffa500', value: 'orange' },
+      { label: '#0B0B45', value: 'indigo' },
+      { label: '#008080', value: 'teal' },
+      { label: '#718096', value: 'gray' },
+      { label: '#ffff00', value: 'yellow' }
+    ],
+    workspaces: [], // Добавлено
+    selectedWorkspace: null, // Добавлено
+    selectedProject: null, // Добавлено
+    columns: [], // Добавлено
+    tasks: [], // Добавлено
+    isInitialized: false, // Добавлено
+    editingColumnIndex: null, // Добавлено
+    newTaskColumn: null, // Добавлено
+    newTaskName: '', // Добавлено
+
+    // Инициализация
+    init() {
+      console.log('Инициализация вызвана');
+      if (this.isInitialized) {
+        console.log('Инициализация уже выполнена, пропускаем');
+        return;
+      }
+      
+      console.log('Выполняем инициализацию...');
+      this.isInitialized = true;
+      this.getData();
+    },
+
+    // Загрузка данных
+    getData() {
+      const themeFromLocalStorage = JSON.parse(localStorage.getItem('KB-theme'));
+      this.bannerImage = localStorage.getItem('KB-bannerImage') || '';
+      this.colorSelected = themeFromLocalStorage || { label: '#3182ce', value: 'blue' };
+    
+      // Загружаем пространства
+      api_client.get('/workspaces/')
+        .then(response => {
+          this.workspaces = response.data;
+          console.log('Пространства загружены:', this.workspaces);
+    
+          if (this.workspaces.length > 0) {
+            this.selectedWorkspace = this.workspaces[0].id;
+            this.loadProjects(this.selectedWorkspace);
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка при загрузке пространств:', error);
+        });
+    },
+    // Загрузка проектов
+    loadProjects(workspaceId) {
+      this.selectedWorkspace = workspaceId;
+      this.selectedProject = null;
+      this.columns = [];
+      this.tasks = [];
+
+      api_client.get(`/workspaces/${workspaceId}/projects/`)
+        .then(response => {
+          const workspace = this.workspaces.find(w => w.id === workspaceId);
+          if (workspace) {
+            workspace.projects = response.data;
+
+            if (workspace.projects.length > 0) {
+              this.selectedProject = workspace.projects[0].id;
+              this.loadBoard(this.selectedProject);
+            }
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка при загрузке проектов:', error);
+        });
+    },
+
+    // Загрузка колонок и задач
+    loadBoard(projectId) {
+      if (this.selectedProject === projectId && this.columns.length > 0) {
+        console.log(`Проект ${projectId} уже загружен, пропускаем`);
+        return;
+      }
+    
+      console.log(`Загружаем доску для проекта ${projectId}`);
+      this.selectedProject = projectId;
+      this.columns = [];
+      this.tasks = [];
+    
+      api_client.get(`/projects/${projectId}/columns/`)
+        .then(response => {
+          console.log(`Получены колонки для проекта ${projectId}:`, response.data);
+          this.columns = response.data;
+          
+          const taskPromises = this.columns.map(column => 
+            api_client.get(`/columns/${column.id}/tasks/`)
+              .then(response => {
+                console.log(`Получены задачи для колонки ${column.id}:`, response.data);
+                response.data.forEach(task => {
+                  if (!this.tasks.some(t => t.id === task.id)) {
+                    this.tasks.push(task);
+                  }
+                });
+              })
+              .catch(error => {
+                console.error(`Ошибка при загрузке задач для колонки ${column.id}:`, error);
+              })
+          );
+          
+          Promise.all(taskPromises)
+            .then(() => {
+              console.log('Все задачи загружены:', this.tasks);
+            });
+        })
+        .catch(error => {
+          console.error(`Ошибка при загрузке колонок для проекта ${projectId}:`, error);
+        });
+    },
+
+    // Начать редактирование колонки
+    startEditColumn(index) {
+      this.editingColumnIndex = index;
+      setTimeout(() => {
+        const inputElement = document.getElementById('columnInput' + index);
+        if (inputElement) {
+          inputElement.focus();
+          inputElement.select();
+        }
+      }, 0);
+    },
+
+    // Сохранить название колонки
+    saveColumnTitle(index) {
+      const newTitle = this.columns[index].name.trim();
+      if (!newTitle) {
+        return;
+      }
+
+      const columnId = this.columns[index].id;
+
+      api_client.patch(`/columns/${columnId}/`, { name: newTitle })
+        .then(response => {
+          console.log('Колонка обновлена:', response.data);
+          this.editingColumnIndex = null;
+        })
+        .catch(error => {
+          console.error('Ошибка при обновлении колонки:', error);
+        });
+    },
+
+    // Добавить новую задачу
+// Добавить новую задачу
+    async addTask(columnId) {
+      const taskName = this.newTaskName.trim();
+
+      if (!taskName) {
+        alert('Название задачи не может быть пустым');
+        return;
+      }
+
+      try {
+        const response = await api_client.post('/tasks/', {
+          name: taskName,
+          column: columnId,
+        });
+
+        // Добавляем новую задачу в список
+        this.tasks.push({
+          id: response.data.id,
+          name: taskName,
+          column: columnId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        // Очищаем поле ввода и скрываем его
+        this.newTaskName = '';
+        this.newTaskColumn = null;
+      } catch (error) {
+        console.error('Ошибка при создании задачи:', error);
+        alert('Не удалось создать задачу');
+      }
+    },
+
+    // Метод для отмены создания задачи
+    cancelNewTask() {
+      this.newTaskName = '';
+      this.newTaskColumn = null;
+    },
+
+    // Метод для отображения поля ввода
+    showNewTaskInput(columnId) {
+      this.newTaskColumn = columnId;
+      this.newTaskName = ''; // Очищаем поле ввода
+      this.$nextTick(() => {
+        const inputElement = this.$refs['newTaskInput-' + columnId];
+        if (inputElement) {
+          inputElement.focus();
+        }
+      });
+    },
+
+    // Завершить редактирование задачи
+    finishEditTask(task) {
+      if (task.name.trim() === '') {
+        this.removeTask(task.id);
+        return;
+      }
+
+      const element = document.getElementById(task.id);
+      if (element) {
+        element.setAttribute('draggable', 'true');
+      }
+
+      api_client.patch(`/tasks/${task.id}/`, {
+        name: task.name
+      })
+        .then(response => {
+          console.log('Задача обновлена:', response.data);
+          task.edit = false;
+        })
+        .catch(error => {
+          console.error('Ошибка при обновлении задачи:', error);
+        });
+    },
+
+    // Удалить задачу
+    removeTask(taskId) {
+      api_client.delete(`/tasks/${taskId}/`)
+        .then(() => {
+          this.tasks = this.tasks.filter(t => t.id !== taskId);
+        })
+        .catch(error => {
+          console.error('Ошибка при удалении задачи:', error);
+        });
+    },
+
+    saveSettings() {
+      const theme = JSON.stringify(this.colorSelected);
+      localStorage.setItem('KB-theme', theme);
+      localStorage.setItem('KB-bannerImage', this.bannerImage);
+      this.showSettingsPage = false;
+    },
+
+    onDragStart(event, taskId) {
+      const task = this.tasks.find(t => t.id === taskId);
+      if (task && task.edit) {
+        event.preventDefault();
+        return false;
+      }
+      event.dataTransfer.setData('text/plain', taskId); // Передаем ID задачи
+      event.target.classList.add('opacity-5'); // Делаем задачу полупрозрачной при перетаскивании
+    },
+
+    onDragOver(event) {
+      event.preventDefault(); // Разрешаем перетаскивание
+      return false;
+    },
+    
+    onDragEnter(event) {
+      event.target.classList.add('bg-gray-200'); // Подсвечиваем область при наведении
+    },
+    
+    onDragLeave(event) {
+      event.target.classList.remove('bg-gray-200'); // Убираем подсветку
+    },
+    
+    onDrop(event, columnId) {
+      event.stopPropagation();
+      event.preventDefault();
+      event.target.classList.remove('bg-gray-200');
+    
+      const taskId = event.dataTransfer.getData('text');
+      const draggableElement = document.getElementById(taskId); // Находим элемент задачи
+      const dropzone = event.currentTarget; // Текущая колонка, куда перетащили задачу
+    
+      // Перемещаем задачу в новую колонку
+      dropzone.appendChild(draggableElement);
+    
+      // Обновляем колонку задачи на сервере
+      api_client.patch(`/tasks/${taskId}/`, { column: columnId })
+        .then(response => {
+          console.log('Задача обновлена:', response.data);
+    
+          // Обновляем задачу в массиве tasks
+          const updatedTask = response.data;
+          const taskIndex = this.tasks.findIndex(t => t.id === updatedTask.id);
+          if (taskIndex !== -1) {
+            this.tasks[taskIndex] = updatedTask;
+          }
+        })
+        .catch(error => {
+          console.error('Ошибка при обновлении задачи:', error);
+    
+          // В случае ошибки возвращаем задачу в исходную колонку
+          const originalColumn = document.querySelector(`[data-column-id="${task.column}"]`);
+          if (originalColumn) {
+            originalColumn.appendChild(draggableElement);
+          }
+        });
+    }
+  };
+}
+</script>
+</body>
+{% endblock %}
