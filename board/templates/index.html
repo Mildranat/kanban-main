@@ -125,26 +125,29 @@
                           </button>
                         </div>
                         <div class="px-4">
-                          <div @dragover="onDragOver(event)" 
-                          @drop="onDrop(event, column.id)" 
-                          @dragenter="onDragEnter(event)" 
-                          @dragleave="onDragLeave(event)" 
-                          class="pt-2 pb-20 rounded-lg">
-                       <!-- Отображение существующих задач -->
-                       <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="taskIndex">
-                         <div :id="t.id" 
-                              class="bg-white rounded-lg shadow mb-3" 
+                          <div @dragover.prevent="onDragOver" 
+                               @drop="onDrop(event, column.id)" 
+                               @dragenter="onDragEnter(event)" 
+                               @dragleave="onDragLeave(event)" 
+                               class="pt-2 pb-20 rounded-lg dropzone"
+                               :data-column-id="column.id">
+    
+                        <!-- Отображение существующих задач -->
+                        <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
+                          <div :id="t.id" 
+                              class="bg-white rounded-lg shadow mb-3 task-item" 
                               draggable="true" 
-                              @dragstart="onDragStart($event, t.id)">
-                           <div class="flex justify-between items-center p-2">
-                             <div x-text="t.name" class="text-gray-800"></div>
-                             <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">
-                               × <!-- Символ крестика -->
-                             </button>
-                           </div>
-                           <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
-                         </div>
-                       </template>
+                              @dragstart="onDragStart($event, t.id)"
+                              @dragend="onDragEnd($event)">
+                            <div class="flex justify-between items-center p-2">
+                              <div x-text="t.name" class="text-gray-800"></div>
+                              <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">
+                                × <!-- Символ крестика -->
+                              </button>
+                            </div>
+                            <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
+                          </div>
+                        </template>
            
                             <!-- Поле ввода для новой задачи -->
                             <div x-show="newTaskColumn === column.id" class="bg-white rounded-lg shadow mb-3 p-2">
@@ -155,7 +158,6 @@
                                 @keydown.enter="addTask(column.id)"
                                 @keydown.escape="cancelNewTask()"
                                 class="bg-gray-200 appearance-none border-2 border-gray-200 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500"
-                                x-ref="'newTaskInput-' + column.id"
                               >
                             </div>
                           </div>
@@ -431,62 +433,86 @@ function board() {
     },
 
     onDragStart(event, taskId) {
+      // Prevent dragging if in edit mode
       const task = this.tasks.find(t => t.id === taskId);
       if (task && task.edit) {
         event.preventDefault();
         return false;
       }
-      event.dataTransfer.setData('text/plain', taskId); // Передаем ID задачи
-      event.target.classList.add('opacity-5'); // Делаем задачу полупрозрачной при перетаскивании
+      
+      // Store the task ID and set proper dragging visual
+      event.dataTransfer.setData('text/plain', taskId);
+      event.target.classList.add('opacity-50');
+      
+      // Important: Set the effectAllowed to move
+      event.dataTransfer.effectAllowed = 'move';
     },
-
+    
+    onDragEnd(event) {
+      // Remove opacity class when drag ends
+      event.target.classList.remove('opacity-50');
+    },
+    
     onDragOver(event) {
-      event.preventDefault(); // Разрешаем перетаскивание
+      // Prevent default to allow drop
+      event.preventDefault();
+      // Set dropEffect to move
+      event.dataTransfer.dropEffect = 'move';
       return false;
     },
     
     onDragEnter(event) {
-      event.target.classList.add('bg-gray-200'); // Подсвечиваем область при наведении
+      // Only add highlight to the dropzone element
+      if (event.currentTarget.classList.contains('dropzone')) {
+        event.currentTarget.classList.add('bg-gray-200');
+      }
     },
     
     onDragLeave(event) {
-      event.target.classList.remove('bg-gray-200'); // Убираем подсветку
+      // Only remove highlight from the dropzone element
+      if (event.currentTarget.classList.contains('dropzone')) {
+        event.currentTarget.classList.remove('bg-gray-200');
+      }
     },
-    
     onDrop(event, columnId) {
       event.stopPropagation();
       event.preventDefault();
-      event.target.classList.remove('bg-gray-200');
+      
+      const taskId = event.dataTransfer.getData('text/plain');
+      if (!taskId) {
+        console.error('No task ID found in the drag data');
+        return;
+      }
     
-      const taskId = event.dataTransfer.getData('text');
-      const draggableElement = document.getElementById(taskId); // Находим элемент задачи
-      const dropzone = event.currentTarget; // Текущая колонка, куда перетащили задачу
+      const task = this.tasks.find(t => t.id == taskId);
+      if (!task) {
+        console.error('Task not found:', taskId);
+        return;
+      }
     
-      // Перемещаем задачу в новую колонку
-      dropzone.appendChild(draggableElement);
+      if (task.column === columnId) {
+        console.log('Task already in this column');
+        return;
+      }
     
-      // Обновляем колонку задачи на сервере
+      // Обновляем состояние задачи
+      task.column = columnId;
+      this.tasks = [...this.tasks]; // Обновляем реактивность
+    
+      // Отправляем данные на сервер
       api_client.patch(`/tasks/${taskId}/`, { column: columnId })
         .then(response => {
-          console.log('Задача обновлена:', response.data);
-    
-          // Обновляем задачу в массиве tasks
-          const updatedTask = response.data;
-          const taskIndex = this.tasks.findIndex(t => t.id === updatedTask.id);
-          if (taskIndex !== -1) {
-            this.tasks[taskIndex] = updatedTask;
-          }
+          console.log('Task updated successfully:', response.data);
         })
         .catch(error => {
-          console.error('Ошибка при обновлении задачи:', error);
-    
-          // В случае ошибки возвращаем задачу в исходную колонку
-          const originalColumn = document.querySelector(`[data-column-id="${task.column}"]`);
-          if (originalColumn) {
-            originalColumn.appendChild(draggableElement);
-          }
+          console.error('Error updating task:', error.response?.data || error.message);
+          
+          // Откат изменений в случае ошибки
+          task.column = originalColumnId;
+          this.tasks = [...this.tasks];
         });
     }
+     
   };
 }
 </script>
