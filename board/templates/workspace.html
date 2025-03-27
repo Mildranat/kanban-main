@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ workspace.name }}{% endblock %}
+
+{% block content %}
+<body class="antialiased sans-serif bg-gray-300">
+  <div class="flex">
+    <!-- Боковое меню -->
+    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
+      <h2 class="text-xl font-bold">Меню</h2>
+      <ul class="mt-4">
+        <li class="mb-2">
+          <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
+        </li>
+        <li class="mb-2">
+          <a href="/tasks" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
+        </li>
+        <li class="mb-2">
+          <a href="/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
+        </li>
+      </ul>  
+      <h2 class="text-xl font-bold mt-6">Пространства</h2>
+      <ul class="mt-4">
+        {% for ws in request.user.workspaces.all %}
+          <li class="mb-2">
+            <a href="{% url 'board:workspace' ws.id %}" 
+               class="block px-4 py-2 rounded-lg hover:bg-gray-700 {% if ws.id == workspace.id %}bg-gray-700{% endif %}">
+              {{ ws.name }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <!-- Основной контент -->
+    <div class="flex-1 p-8">
+      <div class="bg-white rounded-lg shadow p-6">
+        <h1 class="text-2xl font-bold mb-6">{{ workspace.name }}</h1>
+        
+        <div class="mb-4">
+          <a href="/" class="text-blue-500 hover:text-blue-700">← На главную</a>
+        </div>
+        
+        <h2 class="text-xl font-semibold mb-4">Проекты</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {% for project in projects %}
+            <a href="{% url 'board:project' project.id %}" 
+               class="block p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+              <h3 class="font-medium">{{ project.name }}</h3>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+{% endblock %}

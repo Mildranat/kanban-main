@@ -1,38 +1,58 @@
+import json
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 
 from .forms import NewUserForm
-from board.models import Workspace
+from board.models import Project, Task, Workspace
 
+from django.db.models import Count
+from django.utils import timezone
+from datetime import datetime
 @login_required
 def home(request):
-    # Получаем все пространства пользователя
-    workspaces = Workspace.objects.filter(owner=request.user).prefetch_related('projects')
-    workspaces_data = []
+    today = datetime.today().date()
+    completed_tasks_count = Task.objects.filter(
+        column__project__workspace__owner=request.user,
+        updated_at__date=today,
+        column__name="Завершено" 
+    ).count()
 
-    for workspace in workspaces:
-        workspace_dict = {
-            'id': workspace.id,
-            'name': workspace.name,
-            'projects': []
-        }
-
-        # Получаем все проекты в пространстве
-        projects = workspace.projects.all()
-        for project in projects:
-            project_dict = {
-                'id': project.id,
-                'name': project.name,
-            }
-            workspace_dict['projects'].append(project_dict)
-
-        workspaces_data.append(workspace_dict)
-
+    workspaces = Workspace.objects.filter(owner=request.user)
+    
     return render(request, 'index.html', {
-        'workspaces': workspaces_data,
+        'completed_tasks_count': completed_tasks_count,
+        'workspaces': workspaces,
+    })
+
+@login_required
+def board_view(request, project_id):
+    project = get_object_or_404(Project, id=project_id, workspace__owner=request.user)
+    workspaces = Workspace.objects.filter(owner=request.user).prefetch_related('projects')
+    
+    workspaces_data = []
+    for ws in workspaces:
+        workspaces_data.append({
+            'id': ws.id,
+            'name': ws.name,
+            'projects': [{'id': p.id, 'name': p.name} for p in ws.projects.all()]
+        })
+    
+    return render(request, 'board.html', {
+        'workspaces': json.dumps(workspaces_data),  # Явное преобразование в JSON
+        'project': project,
+    })
+
+@login_required
+def workspace_view(request, workspace_id):
+    workspace = get_object_or_404(Workspace, id=workspace_id, owner=request.user)
+    projects = workspace.projects.all()
+    
+    return render(request, 'workspace.html', {
+        'workspace': workspace,
+        'projects': projects,
     })
 
 def register_request(request):
@@ -53,7 +73,6 @@ def register_request(request):
                   template_name='register.html',
                   context={'register_form': form})
 
-
 def login_request(request):
     if request.method == 'POST':
         form = AuthenticationForm(request, data=request.POST)
@@ -73,7 +92,6 @@ def login_request(request):
     form = AuthenticationForm()
     return render(request=request, template_name='login.html',
                   context={'login_form': form})
-
 
 def logout_request(request):
     logout(request)

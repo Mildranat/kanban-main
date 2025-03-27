@@ -38,8 +38,10 @@ class ListTasksByColumn(generics.ListAPIView):
 
     def get_queryset(self):
         column_id = self.kwargs['column_id']
-        return Task.objects.filter(column_id=column_id, column__project__workspace__owner=self.request.user)
-
+        return Task.objects.filter(
+            column_id=column_id, 
+            column__project__workspace__owner=self.request.user
+        )
 # Колонки
 class ListCreateColumn(generics.ListCreateAPIView):
     serializer_class = ColumnSerializer
@@ -62,8 +64,11 @@ class ListColumnsByProject(generics.ListAPIView):
 
     def get_queryset(self):
         project_id = self.kwargs['project_id']
-        return Column.objects.filter(project_id=project_id, project__workspace__owner=self.request.user)
-
+        return Column.objects.filter(
+            project_id=project_id, 
+            project__workspace__owner=self.request.user
+        )
+    
 class DetailColumn(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ColumnSerializer
     authentication_classes = [SessionAuthentication]
