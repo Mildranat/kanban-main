@@ -1,21 +1,18 @@
 {% extends "base.html" %}
-
 {% block title %}
 Канбан-доска
 {% endblock %}
-
 {% block content %}
-<body class="antialiased sans-serif bg-gray-300">
+<body class="antialiased sans-serif bg-gray-300" x-data="board">
   <div class="flex">
-    <!-- Боковое меню -->
-    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6" x-data>
+    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
       <h2 class="text-xl font-bold">Меню</h2>
       <ul class="mt-4">
         <li class="mb-2">
           <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
         </li>
         <li class="mb-2">
-          <a href="/tasks" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
+          <a href="/notifications" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
         </li>
         <li class="mb-2">
           <a href="/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
@@ -25,39 +22,34 @@
       <ul class="mt-4">
         <template x-for="workspace in workspaces" :key="workspace.id">
           <li class="mb-2">
-            <div @click="loadProjects(workspace.id)" class="block px-4 py-2 rounded-lg hover:bg-gray-700 cursor-pointer">
+            <div @click="selectedWorkspace = (selectedWorkspace === workspace.id ? null : workspace.id)" 
+                 class="block px-4 py-2 rounded-lg hover:bg-gray-700 cursor-pointer">
               <span x-text="workspace.name"></span>
             </div>
             <ul class="ml-4" x-show="selectedWorkspace === workspace.id">
-                <template x-for="project in workspace.projects" :key="project.id">
-                    <li class="mb-2">
-                      <div @click="loadBoard(project.id)" 
-                           class="block px-4 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
-                           :class="{ 'bg-gray-700': selectedProject === project.id }">
-                        <span x-text="project.name"></span>
-                      </div>
-                    </li>
-                  </template>
+              <template x-for="project in workspace.projects" :key="project.id">
+                <li class="mb-2">
+                  <a :href="'/project/' + project.id" 
+                     class="block px-4 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
+                     :class="{ 'bg-gray-700': selectedProject === project.id }">
+                    <span x-text="project.name"></span>
+                  </a>
+                </li>
+              </template>
             </ul>
           </li>
         </template>
       </ul>
     </nav>
-
-    <!-- Основной контент -->
-    <div x-data="board" x-init="init()" x-cloak class="flex-1 flex flex-col min-h-screen border-t-8" :class="`border-${colorSelected.value}-700`">
+    <div x-cloak class="flex-1 flex flex-col min-h-screen border-t-8" :class="`border-${colorSelected.value}-700`">
       <div class="flex-1">
-        <!-- Хедер -->
         <div class="bg-cover bg-center bg-no-repeat" :class="`bg-${colorSelected.value}-900`" :style="`background-image: url(${bannerImage})`">        
           <div class="container mx-auto px-4 pt-4 md:pt-10 pb-40"></div>
-        </div>
-        <!-- конец хедера -->    
+        </div>  
         <div class="container mx-auto px-4 py-4 -mt-40">
           {% include 'settings.html' %}
-          <!-- Главная -->
           <div x-show.immediate="showSettingsPage == false">
             <div x-show.transition="showSettingsPage == false">
-              <!-- Приветствие -->
               <div class="flex justify-between items-center mb-2">
                 <div>
                   <h1 class="text-xl md:text-2xl text-gray-300 font-semibold">
@@ -79,81 +71,90 @@
                     <i class="uil uil-sign-out-alt mr-1"></i>Выход</a>
                 </div>
               </div>
-              <!-- Конец блока Приветствие -->    
-              <!-- Канбан-доска -->
               <div class="py-4 md:py-8">
                 <form id="task-form">
                   {% csrf_token %}
                 </form>
                 <div class="flex -mx-4 block overflow-x-auto pb-2">
-                  <template x-for="(column, columnIndex) in columns" :key="column.id">
-                    
-<!-- Внутри блока, где отображаются колонки -->
-<div class="w-64 mx-2" x-data="{ column }">
-  <div class="bg-gray-100 rounded-lg p-4 dropzone"
-       @dragover.prevent="onDragOver($event)"
-       @dragenter.prevent="onDragEnter($event)"
-       @dragleave.prevent="onDragLeave($event)"
-       @drop.prevent="onDrop($event, column.id)">
-    <!-- Название колонки с возможностью редактирования -->
-    <div class="flex justify-between items-center mb-2">
-      <template x-if="editingColumnIndex !== columnIndex">
-        <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
-      </template>
-      <template x-if="editingColumnIndex === columnIndex">
-        <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
-               @blur="saveColumnTitle(columnIndex)"
-               @keydown.enter="saveColumnTitle(columnIndex)"
-               @keydown.escape="editingColumnIndex = null"
-               class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-      </template>
-    </div>
-    <!-- Задачи в колонке -->
-    <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
-      <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
-           @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
-        <div class="flex justify-between items-center p-2">
-          <!-- Отображение названия задачи или поля ввода -->
-          <template x-if="editingTaskId !== t.id">
-            <div x-text="t.name" @click="startEditTask(t.id)" class="text-gray-800 cursor-pointer"></div>
-          </template>
-          <template x-if="editingTaskId === t.id">
-            <input :id="'task-edit-' + t.id" type="text" x-model="t.name"
-                   @blur="finishEditTask(t)"
-                   @keydown.enter="finishEditTask(t)"
-                   @keydown.escape="cancelEditTask()"
-                   class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-          </template>
-          <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">×</button>
-        </div>
-        <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
-      </div>
-    </template>
-    <!-- Кнопка "+" для добавления новой задачи -->
-    <div class="mt-2">
-      <template x-if="newTaskColumn !== column.id">
-        <button @click="showNewTaskInput(column.id)" class="w-full text-center text-gray-500 hover:text-gray-700">
-          + Добавить задачу
-        </button>
-      </template>
-      <template x-if="newTaskColumn === column.id">
-        <div>
-          <input x-ref="'newTaskInput-' + column.id" type="text" x-model="newTaskName"
-                 @keydown.enter="addTask(column.id)"
-                 @keydown.escape="cancelNewTask()"
-                 class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-        </div>
-      </template>
-    </div>
-  </div>
-</div>
+                  <template x-for="(column, columnIndex) in columns" :key="column.id">                 
+                    <div class="w-64 mx-2">
+                      <div class="bg-gray-100 rounded-lg p-4 dropzone"
+                           @dragover.prevent="onDragOver($event)"
+                           @dragenter.prevent="onDragEnter($event)"
+                           @dragleave.prevent="onDragLeave($event)"
+                           @drop.prevent="onDrop($event, column.id)">
+                        <div class="flex justify-between items-center mb-2">
+                          <template x-if="editingColumnIndex !== columnIndex">
+                            <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
+                          </template>
+                          <template x-if="editingColumnIndex === columnIndex">
+                            <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
+                                   @blur="saveColumnTitle(columnIndex)"
+                                   @keydown.enter="saveColumnTitle(columnIndex)"
+                                   @keydown.escape="editingColumnIndex = null"
+                                   class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                          </template>
+                        </div>
+                        <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
+                          <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
+                               @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
+                            <div class="flex justify-between items-center p-2">
+                              <template x-if="editingTaskId !== t.id">
+                                <div x-text="t.name" @click="startEditTask(t.id)" class="text-gray-800 cursor-pointer"></div>
+                              </template>
+                              <template x-if="editingTaskId === t.id">
+                                <input :id="'task-edit-' + t.id" type="text" x-model="t.name"
+                                       @blur="finishEditTask(t)"
+                                       @keydown.enter="finishEditTask(t)"
+                                       @keydown.escape="cancelEditTask()"
+                                       class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                              </template>
+                              <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">×</button>
+                            </div>
+                            <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
+                          </div>
+                        </template>
+                        <div class="mt-2">
+                          <template x-if="newTaskColumn !== column.id">
+                            <button @click="showNewTaskInput(column.id)" class="w-full text-center text-gray-500 hover:text-gray-700">
+                              + Добавить задачу
+                            </button>
+                          </template>
+                          <template x-if="newTaskColumn === column.id">
+                            <div>
+                              <input x-ref="'newTaskInput-' + column.id" type="text" x-model="newTaskName"
+                                     @keydown.enter="addTask(column.id)"
+                                     @keydown.escape="cancelNewTask()"
+                                     class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
                   </template>
+                  
+                  <!-- Кнопка добавления новой колонки -->
+                  <div class="w-64 mx-2">
+                    <div class="bg-gray-100 rounded-lg p-4">
+                      <template x-if="!addingNewColumn">
+                        <button @click="startAddingColumn()" class="w-full text-center text-gray-500 hover:text-gray-700">
+                          + Добавить колонку
+                        </button>
+                      </template>
+                      <template x-if="addingNewColumn">
+                        <div>
+                          <input x-ref="newColumnInput" type="text" x-model="newColumnName"
+                                 @keydown.enter="addColumn()"
+                                 @keydown.escape="cancelAddingColumn()"
+                                 class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                        </div>
+                      </template>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <!-- конец Канбан-доски -->
             </div>
           </div>
-          <!-- конец Главной -->
         </div>
       </div>
     </div>
@@ -162,7 +163,9 @@
   <script>
     document.addEventListener('alpine:init', () => {
       Alpine.data('board', () => ({
-        // Initial state
+        workspaces: JSON.parse('{{ workspaces_json|escapejs }}'),
+        selectedWorkspace: null,
+        selectedProject: {{ project.id }},
         showSettingsPage: false,
         bannerImage: '',
         colorSelected: { label: '#3182ce', value: 'blue' },
@@ -177,9 +180,6 @@
           { label: '#718096', value: 'gray' },
           { label: '#ffff00', value: 'yellow' }
         ],
-        workspaces: JSON.parse('{{ workspaces|safe|escapejs }}'),
-        selectedWorkspace: null,
-        selectedProject: null,
         columns: [],
         tasks: [],
         editingTaskId: null,
@@ -187,28 +187,24 @@
         editingColumnIndex: null,
         newTaskColumn: null,
         newTaskName: '',
+        addingNewColumn: false,
+        newColumnName: '',
         api_client: null,
     
         init() {
           if (this.isInitialized) return;
           this.isInitialized = true;
     
-          // Initialize API client
           const csrftoken = document.querySelector('#task-form > input').value;
           this.api_client = axios.create({
             baseURL: '/api',
             headers: { 'X-CSRFToken': csrftoken },
           });
-    
-          // Get project_id from URL
-          const urlParts = window.location.pathname.split('/');
-          const potentialProjectId = urlParts[urlParts.length - 2];
+
+          this.getData();
           
-          if (potentialProjectId && !isNaN(potentialProjectId)) {
-            this.loadBoard(parseInt(potentialProjectId));
-          } else {
-            this.getData();
-          }
+          // Загружаем доску для текущего проекта
+          this.loadBoard(this.selectedProject);
         },
     
         getData() {
@@ -217,8 +213,9 @@
           this.colorSelected = themeFromLocalStorage || { label: '#3182ce', value: 'blue' };
     
           if (this.workspaces.length > 0) {
-            this.selectedWorkspace = this.workspaces[0].id;
-            this.loadProjects(this.selectedWorkspace);
+            this.selectedWorkspace = this.workspaces.find(w => 
+              w.projects.some(p => p.id === this.selectedProject)
+            )?.id || this.workspaces[0].id;
           }
         },
     
@@ -246,11 +243,9 @@
           this.tasks = [];
         
           try {
-            // Load columns for current project
             const columnsResponse = await this.api_client.get(`/projects/${projectId}/columns/`);
             this.columns = columnsResponse.data;
             
-            // Load tasks for each column
             for (const column of this.columns) {
               try {
                 const tasksResponse = await this.api_client.get(`/columns/${column.id}/tasks/`);
@@ -259,10 +254,50 @@
                 console.error(`Error loading tasks for column ${column.id}:`, error);
               }
             }
-            
-            console.log('All tasks loaded for project:', projectId, this.tasks);
           } catch (error) {
             console.error('Error loading columns:', error);
+          }
+        },
+    
+        startAddingColumn() {
+          this.addingNewColumn = true;
+          this.newColumnName = '';
+          this.$nextTick(() => {
+            this.$refs.newColumnInput.focus();
+          });
+        },
+        
+        cancelAddingColumn() {
+          this.addingNewColumn = false;
+          this.newColumnName = '';
+        },
+        
+        async addColumn() {
+          const columnName = this.newColumnName.trim();
+          if (!columnName) {
+            alert('Название колонки не может быть пустым');
+            return;
+          }
+          
+          try {
+            const response = await this.api_client.post('/columns/', {
+              name: columnName,
+              project: this.selectedProject,
+              order: this.columns.length
+            });
+            
+            this.columns.push({
+              id: response.data.id,
+              name: columnName,
+              order: this.columns.length,
+              project: this.selectedProject
+            });
+            
+            this.addingNewColumn = false;
+            this.newColumnName = '';
+          } catch (error) {
+            console.error('Error creating column:', error);
+            alert('Не удалось создать колонку');
           }
         },
     
@@ -279,9 +314,7 @@
     
         async saveColumnTitle(index) {
           const newTitle = this.columns[index].name.trim();
-          if (!newTitle) {
-            return;
-          }
+          if (!newTitle) return;
     
           const columnId = this.columns[index].id;
     
@@ -295,9 +328,8 @@
     
         async addTask(columnId) {
           const taskName = this.newTaskName.trim();
-    
           if (!taskName) {
-            alert('Task name cannot be empty');
+            alert('Название задачи не может быть пустым');
             return;
           }
     
@@ -319,7 +351,7 @@
             this.newTaskColumn = null;
           } catch (error) {
             console.error('Error creating task:', error);
-            alert('Failed to create task');
+            alert('Не удалось создать задачу');
           }
         },
     
@@ -452,6 +484,6 @@
         }
       }));
     });
-    </script>
+  </script>
 </body>
 {% endblock %}

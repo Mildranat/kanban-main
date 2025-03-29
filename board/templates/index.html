@@ -5,7 +5,6 @@
 {% block content %}
 <body class="antialiased sans-serif bg-gray-300">
   <div class="flex">
-    <!-- Боковое меню -->
     <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
       <h2 class="text-xl font-bold">Меню</h2>
       <ul class="mt-4">
@@ -13,7 +12,7 @@
           <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
         </li>
         <li class="mb-2">
-          <a href="/tasks" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
+          <a href="/notifications" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
         </li>
         <li class="mb-2">
           <a href="/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
@@ -30,13 +29,9 @@
         {% endfor %}
       </ul>
     </nav>
-
-    <!-- Основной контент -->
     <div class="flex-1 p-8">
       <div class="bg-white rounded-lg shadow p-6">
-        <h1 class="text-2xl font-bold mb-6">Добро пожаловать, {{ request.user.username }}!</h1>
-        
-        <!-- Статистика за сегодня -->
+        <h1 class="text-2xl font-bold mb-6">Добро пожаловать, {{ request.user.username }}!</h1>  
         <div class="mb-8 p-4 bg-blue-50 rounded-lg">
           <h2 class="text-xl font-semibold mb-2">Сегодня</h2>
           <div class="flex items-center">
@@ -47,10 +42,7 @@
               <p class="text-gray-700">Задач выполнено</p>
             </div>
           </div>
-        </div>
-        
-        <!-- Быстрый доступ к пространствам -->
-<!-- Быстрый доступ к пространствам -->
+        </div>      
 <div>
   <h2 class="text-xl font-semibold mb-4">Ваши пространства</h2>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

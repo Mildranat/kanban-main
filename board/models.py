@@ -50,3 +50,23 @@ class Task(models.Model):
     class Meta:
         verbose_name = 'Задача'
         verbose_name_plural = 'Задачи'
+
+
+class Notification(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='notifications')
+    type = models.CharField(max_length=20, choices=[
+        ('task_completed', 'Задача выполнена'),
+        ('task_assigned', 'Задача назначена')
+    ])
+    message = models.TextField()
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Уведомление'
+        verbose_name_plural = 'Уведомления'
+    
+    def __str__(self):
+        return f"{self.get_type_display()} - {self.message[:50]}"

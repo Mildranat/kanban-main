@@ -4,13 +4,10 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import redirect, render, get_object_or_404
-
 from .forms import NewUserForm
 from board.models import Project, Task, Workspace
+from datetime import datetime, timedelta
 
-from django.db.models import Count
-from django.utils import timezone
-from datetime import datetime
 @login_required
 def home(request):
     today = datetime.today().date()
@@ -32,6 +29,7 @@ def board_view(request, project_id):
     project = get_object_or_404(Project, id=project_id, workspace__owner=request.user)
     workspaces = Workspace.objects.filter(owner=request.user).prefetch_related('projects')
     
+    # Сериализуем workspaces в JSON
     workspaces_data = []
     for ws in workspaces:
         workspaces_data.append({
@@ -41,8 +39,9 @@ def board_view(request, project_id):
         })
     
     return render(request, 'board.html', {
-        'workspaces': json.dumps(workspaces_data),  # Явное преобразование в JSON
         'project': project,
+        'workspaces': workspaces_data,
+        'workspaces_json': json.dumps(workspaces_data),  # Для JavaScript
     })
 
 @login_required
@@ -53,6 +52,42 @@ def workspace_view(request, workspace_id):
     return render(request, 'workspace.html', {
         'workspace': workspace,
         'projects': projects,
+    })
+
+@login_required
+def notifications_view(request):
+    # This is a placeholder - you'll need to implement actual notifications logic
+    notifications = [
+        {
+            'type': 'task_completed',
+            'message': 'Задача "Обновить документацию" была выполнена',
+            'created_at': datetime.now(),
+            'read': False
+        },
+        {
+            'type': 'task_assigned',
+            'message': 'Вам назначена новая задача "Проверить баги" от пользователя Иван Иванов',
+            'created_at': datetime.now() - timedelta(hours=2),
+            'read': True
+        }
+    ]
+    
+    workspaces = Workspace.objects.filter(owner=request.user)
+    
+    return render(request, 'notifications.html', {
+        'notifications': notifications,
+        'workspaces': workspaces,
+    })
+
+
+@login_required
+def notifications_view(request):
+    notifications = request.user.notifications.all()
+    workspaces = Workspace.objects.filter(owner=request.user)
+    
+    return render(request, 'notifications.html', {
+        'notifications': notifications,
+        'workspaces': workspaces,
     })
 
 def register_request(request):
