@@ -5,7 +5,6 @@ from api import serializers
 from board.models import Task, Column, Project, Workspace
 from api.serializers import TaskSerializer, ColumnSerializer, ProjectSerializer, WorkspaceSerializer
 
-# Задачи
 class ListTask(generics.ListCreateAPIView):
     serializer_class = TaskSerializer
     authentication_classes = [SessionAuthentication]
@@ -13,14 +12,10 @@ class ListTask(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Task.objects.filter(column__project__workspace__owner=user)
-
-    def perform_create(self, serializer):
-        column_id = self.request.data.get('column')
-        name = self.request.data.get('name')  
-        print(f"Column: {column_id}, Task Name: {name}") 
-        column = Column.objects.get(id=column_id)
-        serializer.save(column=column)
+        return Task.objects.filter(
+            column__project__workspace__owner=user,
+            rejected=False  # Исключаем отклонённые задачи
+        )
 
 class DetailTask(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TaskSerializer
@@ -39,8 +34,9 @@ class ListTasksByColumn(generics.ListAPIView):
     def get_queryset(self):
         column_id = self.kwargs['column_id']
         return Task.objects.filter(
-            column_id=column_id, 
-            column__project__workspace__owner=self.request.user
+            column_id=column_id,
+            column__project__workspace__owner=self.request.user,
+            rejected=False  # Исключаем отклонённые задачи
         )
 # Колонки
 class ListCreateColumn(generics.ListCreateAPIView):

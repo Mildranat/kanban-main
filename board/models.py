@@ -68,15 +68,13 @@ class Notification(models.Model):
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='notifications')
     type = models.CharField(max_length=20, choices=[
         ('task_completed', 'Задача выполнена'),
-        ('task_assigned', 'Задача назначена')
+        ('task_assigned', 'Задача назначена'),
+        ('task_rejected', 'Задача отклонена')  # Добавляем новый тип
     ])
     message = models.TextField()
     read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     task = models.ForeignKey('Task', on_delete=models.CASCADE, null=True, blank=True)
-    
-    # Удаляем поле project, так как можем получить проект через task
-    # project = models.ForeignKey('Project', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -84,11 +82,4 @@ class Notification(models.Model):
         verbose_name_plural = 'Уведомления'
 
     def __str__(self):
-        return f"{self.get_type_display()} - {self.message[:50]}"
-    
-    @property
-    def project(self):
-        """Получаем проект через связанную задачу"""
-        if self.task:
-            return self.task.column.project
-        return None
+        return f"{self.get_type_display()} - {self.message[:50]}"   

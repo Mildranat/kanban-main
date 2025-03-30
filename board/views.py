@@ -83,7 +83,10 @@ def workspace_view(request, workspace_id):
 
 @login_required
 def notifications_view(request):
-    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    # Убираем исключение отклонённых задач
+    notifications = Notification.objects.filter(
+        user=request.user
+    ).order_by('-created_at')
     
     # Помечаем как прочитанные при открытии
     if request.method == 'GET':
@@ -95,6 +98,7 @@ def notifications_view(request):
         'notifications': notifications,
         'workspaces': workspaces,
     })
+
 
 @login_required
 def mark_all_read(request):

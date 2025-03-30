@@ -103,8 +103,8 @@
                           </button>
                         </div>
                         <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
-                          <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
-                               @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
+                            <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
+                                 @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
                             <div class="flex justify-between items-center p-2">
                               <template x-if="editingTaskId !== t.id">
                                 <div x-text="t.name" @click="startEditTask(t.id)" class="text-gray-800 cursor-pointer"></div>
@@ -239,31 +239,35 @@
         },
     
         async loadBoard(projectId) {
-          if (this.selectedProject === projectId && this.columns.length > 0) {
-            console.log(`Project ${projectId} already loaded, skipping`);
-            return;
-          }
-        
-          this.selectedProject = projectId;
-          this.columns = [];
-          this.tasks = [];
-        
-          try {
-            const columnsResponse = await this.api_client.get(`/projects/${projectId}/columns/`);
-            this.columns = columnsResponse.data;
-            
-            for (const column of this.columns) {
-              try {
-                const tasksResponse = await this.api_client.get(`/columns/${column.id}/tasks/`);
-                this.tasks = [...this.tasks, ...tasksResponse.data];
-              } catch (error) {
-                console.error(`Error loading tasks for column ${column.id}:`, error);
-              }
+            if (this.selectedProject === projectId && this.columns.length > 0) {
+              console.log(`Project ${projectId} already loaded, skipping`);
+              return;
             }
-          } catch (error) {
-            console.error('Error loading columns:', error);
-          }
-        },
+          
+            this.selectedProject = projectId;
+            this.columns = [];
+            this.tasks = [];
+          
+            try {
+              const columnsResponse = await this.api_client.get(`/projects/${projectId}/columns/`);
+              this.columns = columnsResponse.data;
+              
+              for (const column of this.columns) {
+                try {
+                  const tasksResponse = await this.api_client.get(`/columns/${column.id}/tasks/`);
+                  // Фильтруем задачи, исключая выполненные и отклоненные
+                  const filteredTasks = tasksResponse.data.filter(task => 
+                    !task.completed && !task.rejected
+                  );
+                  this.tasks = [...this.tasks, ...filteredTasks];
+                } catch (error) {
+                  console.error(`Error loading tasks for column ${column.id}:`, error);
+                }
+              }
+            } catch (error) {
+              console.error('Error loading columns:', error);
+            }
+          },
     
         startAddingColumn() {
           this.addingNewColumn = true;
@@ -481,38 +485,42 @@
         },
     
         async onDrop(event, columnId) {
-          event.stopPropagation();
-          event.preventDefault();
+            event.stopPropagation();
+            event.preventDefault();
+            
+            const taskId = event.dataTransfer.getData('text/plain');
+            if (!taskId) {
+              console.error('No task ID found in the drag data');
+              return;
+            }
           
-          const taskId = event.dataTransfer.getData('text/plain');
-          if (!taskId) {
-            console.error('No task ID found in the drag data');
-            return;
-          }
-        
-          const task = this.tasks.find(t => t.id == taskId);
-          if (!task) {
-            console.error('Task not found:', taskId);
-            return;
-          }
-        
-          if (task.column === columnId) {
-            console.log('Task already in this column');
-            return;
-          }
-        
-          const originalColumnId = task.column;
-          task.column = columnId;
-          this.tasks = [...this.tasks];
-        
-          try {
-            await this.api_client.patch(`/tasks/${taskId}/`, { column: columnId });
-          } catch (error) {
-            console.error('Error updating task:', error.response?.data || error.message);
-            task.column = originalColumnId;
+            const task = this.tasks.find(t => t.id == taskId);
+            if (!task) {
+              console.error('Task not found:', taskId);
+              return;
+            }
+          
+            if (task.column === columnId) {
+              console.log('Task already in this column');
+              return;
+            }
+          
+            const originalColumnId = task.column;
+            task.column = columnId;
             this.tasks = [...this.tasks];
+          
+            try {
+              await this.api_client.patch(`/tasks/${taskId}/`, { 
+                column: columnId,
+                completed: false,  // Убедимся, что задача не помечена как выполненная
+                rejected: false    // или отклоненная при перемещении
+              });
+            } catch (error) {
+              console.error('Error updating task:', error.response?.data || error.message);
+              task.column = originalColumnId;
+              this.tasks = [...this.tasks];
+            }
           }
-        }
       }));
     });
   </script>
