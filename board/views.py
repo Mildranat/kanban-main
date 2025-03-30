@@ -5,22 +5,40 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import redirect, render, get_object_or_404
 from .forms import NewUserForm
-from board.models import Project, Task, Workspace
-from datetime import datetime, timedelta
+from board.models import Notification, Project, Task, Workspace
+from datetime import timedelta
+from django.utils import timezone
 
 @login_required
 def home(request):
-    today = datetime.today().date()
-    completed_tasks_count = Task.objects.filter(
+    today = timezone.now().date()
+    
+    # Подсчет выполненных задач за сегодня
+    completed_tasks = Task.objects.filter(
         column__project__workspace__owner=request.user,
-        updated_at__date=today,
-        column__name="Завершено" 
-    ).count()
-
+        completed=True,
+        completed_at__date=today
+    )
+    
+    # Подсчет отклоненных задач за сегодня
+    rejected_tasks = Task.objects.filter(
+        column__project__workspace__owner=request.user,
+        rejected=True,
+        rejected_at__date=today
+    )
+    
+    completed_tasks_count = completed_tasks.count()
+    rejected_tasks_count = rejected_tasks.count()
+    
+    # Последние выполненные задачи
+    recent_completed_tasks = completed_tasks.order_by('-completed_at')[:3]
+    
     workspaces = Workspace.objects.filter(owner=request.user)
     
     return render(request, 'index.html', {
         'completed_tasks_count': completed_tasks_count,
+        'rejected_tasks_count': rejected_tasks_count,
+        'recent_completed_tasks': recent_completed_tasks,
         'workspaces': workspaces,
     })
 
@@ -29,7 +47,6 @@ def board_view(request, project_id):
     project = get_object_or_404(Project, id=project_id, workspace__owner=request.user)
     workspaces = Workspace.objects.filter(owner=request.user).prefetch_related('projects')
     
-    # Сериализуем workspaces в JSON
     workspaces_data = []
     for ws in workspaces:
         workspaces_data.append({
@@ -41,12 +58,22 @@ def board_view(request, project_id):
     return render(request, 'board.html', {
         'project': project,
         'workspaces': workspaces_data,
-        'workspaces_json': json.dumps(workspaces_data),  # Для JavaScript
+        'workspaces_json': json.dumps(workspaces_data),  
     })
 
 @login_required
 def workspace_view(request, workspace_id):
     workspace = get_object_or_404(Workspace, id=workspace_id, owner=request.user)
+    
+    if request.method == 'POST':
+        project_name = request.POST.get('project_name')
+        if project_name:
+            Project.objects.create(
+                workspace=workspace,
+                name=project_name
+            )
+            return redirect('board:workspace', workspace_id=workspace_id)
+    
     projects = workspace.projects.all()
     
     return render(request, 'workspace.html', {
@@ -56,21 +83,11 @@ def workspace_view(request, workspace_id):
 
 @login_required
 def notifications_view(request):
-    # This is a placeholder - you'll need to implement actual notifications logic
-    notifications = [
-        {
-            'type': 'task_completed',
-            'message': 'Задача "Обновить документацию" была выполнена',
-            'created_at': datetime.now(),
-            'read': False
-        },
-        {
-            'type': 'task_assigned',
-            'message': 'Вам назначена новая задача "Проверить баги" от пользователя Иван Иванов',
-            'created_at': datetime.now() - timedelta(hours=2),
-            'read': True
-        }
-    ]
+    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    
+    # Помечаем как прочитанные при открытии
+    if request.method == 'GET':
+        notifications.filter(read=False).update(read=True)
     
     workspaces = Workspace.objects.filter(owner=request.user)
     
@@ -78,17 +95,13 @@ def notifications_view(request):
         'notifications': notifications,
         'workspaces': workspaces,
     })
-
 
 @login_required
-def notifications_view(request):
-    notifications = request.user.notifications.all()
-    workspaces = Workspace.objects.filter(owner=request.user)
-    
-    return render(request, 'notifications.html', {
-        'notifications': notifications,
-        'workspaces': workspaces,
-    })
+def mark_all_read(request):
+    if request.method == 'POST':
+        Notification.objects.filter(user=request.user, read=False).update(read=True)
+        messages.success(request, 'Все уведомления помечены как прочитанные')
+    return redirect('board:notifications')
 
 def register_request(request):
     if request.method == 'POST':
@@ -99,7 +112,7 @@ def register_request(request):
             messages.success(request,
                              'Аккаунт зарегистрирован: '
                              'добро пожаловать на сайт!')
-            return redirect('board:login')
+            return redirect('board:home')
         messages.error(request, 'Не удалось зарегистрировать аккаунт. '
                                 'Проверьте корректность данных и '
                                 'попробуйте еще раз!')

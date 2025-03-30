@@ -15,7 +15,7 @@
           <a href="/notifications" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
         </li>
         <li class="mb-2">
-          <a href="/settings" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
+          <a href="/organization" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
         </li>
       </ul>  
       <h2 class="text-xl font-bold mt-6">Пространства</h2>
@@ -32,18 +32,55 @@
     <div class="flex-1 p-8">
       <div class="bg-white rounded-lg shadow p-6">
         <h1 class="text-2xl font-bold mb-6">Добро пожаловать, {{ request.user.username }}!</h1>  
-        <div class="mb-8 p-4 bg-blue-50 rounded-lg">
-          <h2 class="text-xl font-semibold mb-2">Сегодня</h2>
-          <div class="flex items-center">
-            <div class="mr-4 p-3 bg-blue-100 rounded-full">
-              <span class="text-blue-600 font-bold">{{ completed_tasks_count }}</span>
+        <div class="mb-8 p-4 bg-white rounded-lg shadow">
+          <h2 class="text-xl font-semibold mb-4">Ваша продуктивность сегодня</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <!-- Выполненные задачи -->
+            <div class="p-4 bg-green-50 rounded-lg">
+              <div class="text-3xl font-bold text-green-600 mb-1">{{ completed_tasks_count }}</div>
+              <div class="text-sm text-gray-600">Задач выполнено</div>
             </div>
-            <div>
-              <p class="text-gray-700">Задач выполнено</p>
+            
+            <!-- Отклоненные задачи -->
+            <div class="p-4 bg-red-50 rounded-lg">
+              <div class="text-3xl font-bold text-red-600 mb-1">{{ rejected_tasks_count }}</div>
+              <div class="text-sm text-gray-600">Задач отклонено</div>
+            </div>
+            
+            <!-- Общая статистика -->
+            <div class="p-4 bg-blue-50 rounded-lg">
+              <div class="text-3xl font-bold text-blue-600 mb-1">
+                {{ completed_tasks_count|add:rejected_tasks_count }}
+              </div>
+              <div class="text-sm text-gray-600">Всего завершено задач</div>
             </div>
           </div>
-        </div>      
-<div>
+          
+          {% if completed_tasks_count > 0 %}
+          <div class="mt-4">
+            <h3 class="font-medium text-gray-700 mb-2">Последние выполненные задачи:</h3>
+            <ul class="space-y-2">
+              {% for task in recent_completed_tasks %}
+              <li class="flex items-start">
+                <span class="mt-1 mr-2 text-green-500">✓</span>
+                <div>
+                  <span class="block">{{ task.name }}</span>
+                  <span class="text-xs text-gray-500">
+                    Завершено в {{ task.completed_at|time:"H:i" }}
+                  </span>
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% else %}
+          <div class="text-center py-4 text-gray-500">
+            Вы еще не выполнили ни одной задачи сегодня.
+          </div>
+          {% endif %}
+        </div>
+
   <h2 class="text-xl font-semibold mb-4">Ваши пространства</h2>
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for workspace in workspaces %}

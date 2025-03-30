@@ -8,7 +8,6 @@ from api.views import (
     ListColumnsByProject,
     ListTasksByColumn
 )
-
 urlpatterns = [
     # Задачи
     path('tasks/', ListTask.as_view()),

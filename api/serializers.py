@@ -8,7 +8,8 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ('id', 'name', 'column', 'created_at', 'owner')
+        fields = ('id', 'name', 'column', 'created_at', 'updated_at', 
+                 'completed', 'rejected', 'completed_at', 'rejected_at', 'owner')
 
 class ColumnSerializer(serializers.ModelSerializer):
     tasks = TaskSerializer(many=True, read_only=True)

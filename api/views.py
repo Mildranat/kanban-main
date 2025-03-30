@@ -17,8 +17,8 @@ class ListTask(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         column_id = self.request.data.get('column')
-        name = self.request.data.get('name')  # Проверь, получаешь ли name
-        print(f"Column: {column_id}, Task Name: {name}")  # Логирование
+        name = self.request.data.get('name')  
+        print(f"Column: {column_id}, Task Name: {name}") 
         column = Column.objects.get(id=column_id)
         serializer.save(column=column)
 

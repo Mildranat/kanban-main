@@ -5,18 +5,16 @@ from board.models import Task, Notification
 @receiver(post_save, sender=Task)
 def create_task_notification(sender, instance, created, **kwargs):
     if created:
-        # Notification for task assignment
         Notification.objects.create(
             user=instance.column.project.workspace.owner,
             type='task_assigned',
-            message=f'Вам назначена новая задача "{instance.name}"',
+            message=f'Новая задача: "{instance.name}" в проекте "{instance.column.project.name}"',
             task=instance
         )
-    elif instance.column.name == "Завершено":
-        # Notification for task completion
+    elif instance.completed:
         Notification.objects.create(
             user=instance.column.project.workspace.owner,
             type='task_completed',
-            message=f'Задача "{instance.name}" была выполнена',
+            message=f'Задача выполнена: "{instance.name}"',
             task=instance
         )
