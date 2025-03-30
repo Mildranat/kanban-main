@@ -84,16 +84,23 @@
                            @dragleave.prevent="onDragLeave($event)"
                            @drop.prevent="onDrop($event, column.id)">
                         <div class="flex justify-between items-center mb-2">
-                          <template x-if="editingColumnIndex !== columnIndex">
-                            <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
-                          </template>
-                          <template x-if="editingColumnIndex === columnIndex">
-                            <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
-                                   @blur="saveColumnTitle(columnIndex)"
-                                   @keydown.enter="saveColumnTitle(columnIndex)"
-                                   @keydown.escape="editingColumnIndex = null"
-                                   class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-                          </template>
+                          <div class="flex items-center">
+                            <template x-if="editingColumnIndex !== columnIndex">
+                              <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
+                            </template>
+                            <template x-if="editingColumnIndex === columnIndex">
+                              <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
+                                     @blur="saveColumnTitle(columnIndex)"
+                                     @keydown.enter="saveColumnTitle(columnIndex)"
+                                     @keydown.escape="editingColumnIndex = null"
+                                     class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                            </template>
+                          </div>
+                          <button @click="removeColumn(column.id, columnIndex)" 
+                                  class="text-red-500 hover:text-red-700 text-lg font-bold ml-2"
+                                  title="Удалить колонку">
+                            ×
+                          </button>
                         </div>
                         <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
                           <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
@@ -132,7 +139,6 @@
                       </div>
                     </div>
                   </template>
-                  
                   <!-- Кнопка добавления новой колонки -->
                   <div class="w-64 mx-2">
                     <div class="bg-gray-100 rounded-lg p-4">
@@ -298,6 +304,31 @@
           } catch (error) {
             console.error('Error creating column:', error);
             alert('Не удалось создать колонку');
+          }
+        },
+
+        async removeColumn(columnId, columnIndex) {
+          if (!confirm('Вы уверены, что хотите удалить эту колонку? Все задачи в ней также будут удалены.')) {
+            return;
+          }
+
+          try {
+            await this.api_client.delete(`/columns/${columnId}/`);
+            
+            // Удаляем задачи этой колонки
+            this.tasks = this.tasks.filter(t => t.column !== columnId);
+            
+            // Удаляем колонку из списка
+            this.columns.splice(columnIndex, 1);
+            
+            // Обновляем порядок оставшихся колонок
+            this.columns.forEach((col, idx) => {
+              col.order = idx;
+              this.api_client.patch(`/columns/${col.id}/`, { order: idx });
+            });
+          } catch (error) {
+            console.error('Error deleting column:', error);
+            alert('Не удалось удалить колонку');
           }
         },
     
