@@ -3,12 +3,10 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>{% block title %} {% endblock %}</title>
+  <title>{% block title %}{% endblock %}</title>
   <link rel="shortcut icon" type='x-icon' href="{% static 'favicon.ico' %}"/>
   <link href="https://unpkg.com/tailwindcss@^1.0/dist/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
-  <script defer src="https://unpkg.com/alpinejs@3.12.0/dist/cdn.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script> 
   <style>
     [x-cloak] {
       display: none;
@@ -50,8 +48,43 @@
     }
   </style>
 </head>
-<body>
-{% block content %}
-{% endblock %}
+<body class="antialiased sans-serif bg-gray-300">
+  <div class="flex">
+    <!-- Навигационное меню -->
+    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
+      <h2 class="text-xl font-bold">Меню</h2>
+      <ul class="mt-4">
+        <li class="mb-2">
+          <a href="{% url 'board:home' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
+        </li>
+        <li class="mb-2">
+          <a href="{% url 'board:notifications' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
+        </li>
+        <li class="mb-2">
+          <a href="{% url 'board:organization' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
+        </li>
+      </ul>  
+      
+      <h2 class="text-xl font-bold mt-6">Пространства</h2>
+      <ul class="mt-4">
+        {% for workspace in workspaces %}
+          <li class="mb-2">
+            <a href="{% url 'board:workspace' workspace.id %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">
+              {{ workspace.name }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    <!-- Основной контент -->
+    <div class="flex-1 p-8">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+  <!-- Скрипты -->
+  <script defer src="https://unpkg.com/alpinejs@3.12.0/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
 </body>
 </html>

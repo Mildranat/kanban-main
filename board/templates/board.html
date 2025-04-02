@@ -1,162 +1,121 @@
 {% extends "base.html" %}
-{% block title %}
-Канбан-доска
-{% endblock %}
+{% block title %}Канбан-доска{% endblock %}
+
 {% block content %}
-<body class="antialiased sans-serif bg-gray-300" x-data="board">
-  <div class="flex">
-    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
-      <h2 class="text-xl font-bold">Меню</h2>
-      <ul class="mt-4">
-        <li class="mb-2">
-          <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
-        </li>
-        <li class="mb-2">
-          <a href="/notifications" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
-        </li>
-        <li class="mb-2">
-          <a href="/organization" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
-        </li>
-      </ul>  
-      <h2 class="text-xl font-bold mt-6">Пространства</h2>
-      <ul class="mt-4">
-        <template x-for="workspace in workspaces" :key="workspace.id">
-          <li class="mb-2">
-            <div @click="selectedWorkspace = (selectedWorkspace === workspace.id ? null : workspace.id)" 
-                 class="block px-4 py-2 rounded-lg hover:bg-gray-700 cursor-pointer">
-              <span x-text="workspace.name"></span>
+<div x-data="board" x-cloak class="flex-1 flex flex-col min-h-screen border-t-8" :class="`border-${colorSelected.value}-700`">
+  <div class="flex-1">
+    <div class="bg-cover bg-center bg-no-repeat" :class="`bg-${colorSelected.value}-900`" :style="`background-image: url(${bannerImage})`">        
+      <div class="container mx-auto px-4 pt-4 md:pt-10 pb-40"></div>
+    </div>  
+    <div class="container mx-auto px-4 py-4 -mt-40">
+      {% include 'settings.html' %}
+      <div x-show.immediate="showSettingsPage == false">
+        <div x-show.transition="showSettingsPage == false">
+          <div class="flex justify-between items-center mb-2">
+            <div>
+              <h1 class="text-xl md:text-2xl text-gray-300 font-semibold">
+                {% now "H" as current_time %}
+                {% if current_time|add:"0" < 12 %}
+                 Доброе утро, {{ request.user.username }}
+                {% elif current_time|add:"0" > 17 %}
+                 Добрый вечер, {{ request.user.username }}
+                {% else %}
+                 Добрый день, {{ request.user.username }}
+                {% endif %}
+              </h1>
+              <div class="text-sm" :class="`text-${colorSelected.value}-400`">{% now 'SHORT_DATE_FORMAT' %}</div>
             </div>
-            <ul class="ml-4" x-show="selectedWorkspace === workspace.id">
-              <template x-for="project in workspace.projects" :key="project.id">
-                <li class="mb-2">
-                  <a :href="'/project/' + project.id" 
-                     class="block px-4 py-2 rounded-lg hover:bg-gray-600 cursor-pointer"
-                     :class="{ 'bg-gray-700': selectedProject === project.id }">
-                    <span x-text="project.name"></span>
-                  </a>
-                </li>
-              </template>
-            </ul>
-          </li>
-        </template>
-      </ul>
-    </nav>
-    <div x-cloak class="flex-1 flex flex-col min-h-screen border-t-8" :class="`border-${colorSelected.value}-700`">
-      <div class="flex-1">
-        <div class="bg-cover bg-center bg-no-repeat" :class="`bg-${colorSelected.value}-900`" :style="`background-image: url(${bannerImage})`">        
-          <div class="container mx-auto px-4 pt-4 md:pt-10 pb-40"></div>
-        </div>  
-        <div class="container mx-auto px-4 py-4 -mt-40">
-          {% include 'settings.html' %}
-          <div x-show.immediate="showSettingsPage == false">
-            <div x-show.transition="showSettingsPage == false">
-              <div class="flex justify-between items-center mb-2">
-                <div>
-                  <h1 class="text-xl md:text-2xl text-gray-300 font-semibold">
-                    {% now "H" as current_time %}
-                    {% if current_time|add:"0" < 12 %}
-                     Доброе утро, {{ request.user.username }}
-                    {% elif current_time|add:"0" > 17 %}
-                     Добрый вечер, {{ request.user.username }}
-                    {% else %}
-                     Добрый день, {{ request.user.username }}
-                    {% endif %}
-                  </h1>
-                  <div class="text-sm" :class="`text-${colorSelected.value}-400`">{% now 'SHORT_DATE_FORMAT' %}</div>
-                </div>
-                <div>
-                  <a @click.prevent="showSettingsPage = !showSettingsPage" href="#" class="rounded-lg px-3 py-2 font-medium inline-flex" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
-                    <i class="uil uil-setting text-left mr-1"></i> Настройки</a>
-                  <a href="/logout" class="rounded-lg px-3 py-2 font-medium inline-flex items-center" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
-                    <i class="uil uil-sign-out-alt mr-1"></i>Выход</a>
-                </div>
-              </div>
-              <div class="py-4 md:py-8">
-                <form id="task-form">
-                  {% csrf_token %}
-                </form>
-                <div class="flex -mx-4 block overflow-x-auto pb-2">
-                  <template x-for="(column, columnIndex) in columns" :key="column.id">                 
-                    <div class="w-64 mx-2">
-                      <div class="bg-gray-100 rounded-lg p-4 dropzone"
-                           @dragover.prevent="onDragOver($event)"
-                           @dragenter.prevent="onDragEnter($event)"
-                           @dragleave.prevent="onDragLeave($event)"
-                           @drop.prevent="onDrop($event, column.id)">
-                        <div class="flex justify-between items-center mb-2">
-                          <div class="flex items-center">
-                            <template x-if="editingColumnIndex !== columnIndex">
-                              <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
-                            </template>
-                            <template x-if="editingColumnIndex === columnIndex">
-                              <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
-                                     @blur="saveColumnTitle(columnIndex)"
-                                     @keydown.enter="saveColumnTitle(columnIndex)"
-                                     @keydown.escape="editingColumnIndex = null"
-                                     class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-                            </template>
-                          </div>
-                          <button @click="removeColumn(column.id, columnIndex)" 
-                                  class="text-red-500 hover:text-red-700 text-lg font-bold ml-2"
-                                  title="Удалить колонку">
-                            ×
-                          </button>
-                        </div>
-                        <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
-                            <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
-                                 @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
-                            <div class="flex justify-between items-center p-2">
-                              <template x-if="editingTaskId !== t.id">
-                                <div x-text="t.name" @click="startEditTask(t.id)" class="text-gray-800 cursor-pointer"></div>
-                              </template>
-                              <template x-if="editingTaskId === t.id">
-                                <input :id="'task-edit-' + t.id" type="text" x-model="t.name"
-                                       @blur="finishEditTask(t)"
-                                       @keydown.enter="finishEditTask(t)"
-                                       @keydown.escape="cancelEditTask()"
-                                       class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-                              </template>
-                              <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">×</button>
-                            </div>
-                            <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
-                          </div>
+            <div>
+              <a @click.prevent="showSettingsPage = !showSettingsPage" href="#" class="rounded-lg px-3 py-2 font-medium inline-flex" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
+                <i class="uil uil-setting text-left mr-1"></i> Настройки</a>
+              <a href="/logout" class="rounded-lg px-3 py-2 font-medium inline-flex items-center" :class="`text-${colorSelected.value}-500 bg-${colorSelected.value}-800 hover:bg-${colorSelected.value}-700`">
+                <i class="uil uil-sign-out-alt mr-1"></i>Выход</a>
+            </div>
+          </div>
+          <div class="py-4 md:py-8">
+            <form id="task-form">
+              {% csrf_token %}
+            </form>
+            <div class="flex -mx-4 block overflow-x-auto pb-2">
+              <template x-for="(column, columnIndex) in columns" :key="column.id">                 
+                <div class="w-64 mx-2">
+                  <div class="bg-gray-100 rounded-lg p-4 dropzone"
+                       @dragover.prevent="onDragOver($event)"
+                       @dragenter.prevent="onDragEnter($event)"
+                       @dragleave.prevent="onDragLeave($event)"
+                       @drop.prevent="onDrop($event, column.id)">
+                    <div class="flex justify-between items-center mb-2">
+                      <div class="flex items-center">
+                        <template x-if="editingColumnIndex !== columnIndex">
+                          <h3 x-text="column.name" @click="startEditColumn(columnIndex)" class="font-bold cursor-pointer"></h3>
                         </template>
-                        <div class="mt-2">
-                          <template x-if="newTaskColumn !== column.id">
-                            <button @click="showNewTaskInput(column.id)" class="w-full text-center text-gray-500 hover:text-gray-700">
-                              + Добавить задачу
-                            </button>
-                          </template>
-                          <template x-if="newTaskColumn === column.id">
-                            <div>
-                              <input x-ref="'newTaskInput-' + column.id" type="text" x-model="newTaskName"
-                                     @keydown.enter="addTask(column.id)"
-                                     @keydown.escape="cancelNewTask()"
-                                     class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
-                            </div>
-                          </template>
-                        </div>
+                        <template x-if="editingColumnIndex === columnIndex">
+                          <input :id="'columnInput' + columnIndex" type="text" x-model="column.name"
+                                 @blur="saveColumnTitle(columnIndex)"
+                                 @keydown.enter="saveColumnTitle(columnIndex)"
+                                 @keydown.escape="editingColumnIndex = null"
+                                 class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                        </template>
                       </div>
+                      <button @click="removeColumn(column.id, columnIndex)" 
+                              class="text-red-500 hover:text-red-700 text-lg font-bold ml-2"
+                              title="Удалить колонку">
+                        ×
+                      </button>
                     </div>
-                  </template>
-                  <!-- Кнопка добавления новой колонки -->
-                  <div class="w-64 mx-2">
-                    <div class="bg-gray-100 rounded-lg p-4">
-                      <template x-if="!addingNewColumn">
-                        <button @click="startAddingColumn()" class="w-full text-center text-gray-500 hover:text-gray-700">
-                          + Добавить колонку
+                    <template x-for="(t, taskIndex) in tasks.filter(t => t.column === column.id)" :key="t.id">
+                        <div :id="t.id" class="bg-white rounded-lg shadow mb-3 task-item" draggable="true"
+                             @dragstart="onDragStart($event, t.id)" @dragend="onDragEnd($event)">
+                        <div class="flex justify-between items-center p-2">
+                          <template x-if="editingTaskId !== t.id">
+                            <div x-text="t.name" @click="startEditTask(t.id)" class="text-gray-800 cursor-pointer"></div>
+                          </template>
+                          <template x-if="editingTaskId === t.id">
+                            <input :id="'task-edit-' + t.id" type="text" x-model="t.name"
+                                   @blur="finishEditTask(t)"
+                                   @keydown.enter="finishEditTask(t)"
+                                   @keydown.escape="cancelEditTask()"
+                                   class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                          </template>
+                          <button @click="removeTask(t.id)" class="text-red-500 hover:text-red-700 text-lg font-bold">×</button>
+                        </div>
+                        <div x-text="t.created_at" class="text-gray-500 text-xs mt-2 p-2"></div>
+                      </div>
+                    </template>
+                    <div class="mt-2">
+                      <template x-if="newTaskColumn !== column.id">
+                        <button @click="showNewTaskInput(column.id)" class="w-full text-center text-gray-500 hover:text-gray-700">
+                          + Добавить задачу
                         </button>
                       </template>
-                      <template x-if="addingNewColumn">
+                      <template x-if="newTaskColumn === column.id">
                         <div>
-                          <input x-ref="newColumnInput" type="text" x-model="newColumnName"
-                                 @keydown.enter="addColumn()"
-                                 @keydown.escape="cancelAddingColumn()"
+                          <input x-ref="'newTaskInput-' + column.id" type="text" x-model="newTaskName"
+                                 @keydown.enter="addTask(column.id)"
+                                 @keydown.escape="cancelNewTask()"
                                  class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
                         </div>
                       </template>
                     </div>
                   </div>
+                </div>
+              </template>
+              <!-- Кнопка добавления новой колонки -->
+              <div class="w-64 mx-2">
+                <div class="bg-gray-100 rounded-lg p-4">
+                  <template x-if="!addingNewColumn">
+                    <button @click="startAddingColumn()" class="w-full text-center text-gray-500 hover:text-gray-700">
+                      + Добавить колонку
+                    </button>
+                  </template>
+                  <template x-if="addingNewColumn">
+                    <div>
+                      <input x-ref="newColumnInput" type="text" x-model="newColumnName"
+                             @keydown.enter="addColumn()"
+                             @keydown.escape="cancelAddingColumn()"
+                             class="bg-gray-200 appearance-none border-2 border-gray-300 rounded w-full py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-blue-500">
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -165,364 +124,364 @@
       </div>
     </div>
   </div>
+</div>
 
-  <script>
-    document.addEventListener('alpine:init', () => {
-      Alpine.data('board', () => ({
-        workspaces: JSON.parse('{{ workspaces_json|escapejs }}'),
-        selectedWorkspace: null,
-        selectedProject: {{ project.id }},
-        showSettingsPage: false,
-        bannerImage: '',
-        colorSelected: { label: '#3182ce', value: 'blue' },
-        colors: [
-          { label: '#3182ce', value: 'blue' },
-          { label: '#38a169', value: 'green' },
-          { label: '#967bb6', value: 'purple' },
-          { label: '#e53e3e', value: 'red' },
-          { label: '#ffa500', value: 'orange' },
-          { label: '#0B0B45', value: 'indigo' },
-          { label: '#008080', value: 'teal' },
-          { label: '#718096', value: 'gray' },
-          { label: '#ffff00', value: 'yellow' }
-        ],
-        columns: [],
-        tasks: [],
-        editingTaskId: null,
-        isInitialized: false,
-        editingColumnIndex: null,
-        newTaskColumn: null,
-        newTaskName: '',
-        addingNewColumn: false,
-        newColumnName: '',
-        api_client: null,
-    
-        init() {
-          if (this.isInitialized) return;
-          this.isInitialized = true;
-    
-          const csrftoken = document.querySelector('#task-form > input').value;
-          this.api_client = axios.create({
-            baseURL: '/api',
-            headers: { 'X-CSRFToken': csrftoken },
-          });
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('board', () => ({
+      workspaces: JSON.parse('{{ workspaces_json|escapejs }}'),
+      selectedWorkspace: null,
+      selectedProject: {{ project.id }},
+      showSettingsPage: false,
+      bannerImage: '',
+      colorSelected: { label: '#3182ce', value: 'blue' },
+      colors: [
+        { label: '#3182ce', value: 'blue' },
+        { label: '#38a169', value: 'green' },
+        { label: '#967bb6', value: 'purple' },
+        { label: '#e53e3e', value: 'red' },
+        { label: '#ffa500', value: 'orange' },
+        { label: '#0B0B45', value: 'indigo' },
+        { label: '#008080', value: 'teal' },
+        { label: '#718096', value: 'gray' },
+        { label: '#ffff00', value: 'yellow' }
+      ],
+      columns: [],
+      tasks: [],
+      editingTaskId: null,
+      isInitialized: false,
+      editingColumnIndex: null,
+      newTaskColumn: null,
+      newTaskName: '',
+      addingNewColumn: false,
+      newColumnName: '',
+      api_client: null,
+  
+      init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+  
+        const csrftoken = document.querySelector('#task-form > input').value;
+        this.api_client = axios.create({
+          baseURL: '/api',
+          headers: { 'X-CSRFToken': csrftoken },
+        });
 
-          this.getData();
-          
-          // Загружаем доску для текущего проекта
+        this.getData();
+        
+        // Загружаем доску для текущего проекта
+        this.loadBoard(this.selectedProject);
+      },
+  
+      getData() {
+        const themeFromLocalStorage = JSON.parse(localStorage.getItem('KB-theme'));
+        this.bannerImage = localStorage.getItem('KB-bannerImage') || '';
+        this.colorSelected = themeFromLocalStorage || { label: '#3182ce', value: 'blue' };
+  
+        if (this.workspaces.length > 0) {
+          this.selectedWorkspace = this.workspaces.find(w => 
+            w.projects.some(p => p.id === this.selectedProject)
+          )?.id || this.workspaces[0].id;
+        }
+      },
+  
+      loadProjects(workspaceId) {
+        this.selectedWorkspace = workspaceId;
+        this.selectedProject = null;
+        this.columns = [];
+        this.tasks = [];
+  
+        const workspace = this.workspaces.find(w => w.id === workspaceId);
+        if (workspace && workspace.projects.length > 0) {
+          this.selectedProject = workspace.projects[0].id;
           this.loadBoard(this.selectedProject);
-        },
-    
-        getData() {
-          const themeFromLocalStorage = JSON.parse(localStorage.getItem('KB-theme'));
-          this.bannerImage = localStorage.getItem('KB-bannerImage') || '';
-          this.colorSelected = themeFromLocalStorage || { label: '#3182ce', value: 'blue' };
-    
-          if (this.workspaces.length > 0) {
-            this.selectedWorkspace = this.workspaces.find(w => 
-              w.projects.some(p => p.id === this.selectedProject)
-            )?.id || this.workspaces[0].id;
+        }
+      },
+  
+      async loadBoard(projectId) {
+          if (this.selectedProject === projectId && this.columns.length > 0) {
+            console.log(`Project ${projectId} already loaded, skipping`);
+            return;
           }
-        },
-    
-        loadProjects(workspaceId) {
-          this.selectedWorkspace = workspaceId;
-          this.selectedProject = null;
+        
+          this.selectedProject = projectId;
           this.columns = [];
           this.tasks = [];
-    
-          const workspace = this.workspaces.find(w => w.id === workspaceId);
-          if (workspace && workspace.projects.length > 0) {
-            this.selectedProject = workspace.projects[0].id;
-            this.loadBoard(this.selectedProject);
+        
+          try {
+            const columnsResponse = await this.api_client.get(`/projects/${projectId}/columns/`);
+            this.columns = columnsResponse.data;
+            
+            for (const column of this.columns) {
+              try {
+                const tasksResponse = await this.api_client.get(`/columns/${column.id}/tasks/`);
+                // Фильтруем задачи, исключая выполненные и отклоненные
+                const filteredTasks = tasksResponse.data.filter(task => 
+                  !task.completed && !task.rejected
+                );
+                this.tasks = [...this.tasks, ...filteredTasks];
+              } catch (error) {
+                console.error(`Error loading tasks for column ${column.id}:`, error);
+              }
+            }
+          } catch (error) {
+            console.error('Error loading columns:', error);
           }
         },
-    
-        async loadBoard(projectId) {
-            if (this.selectedProject === projectId && this.columns.length > 0) {
-              console.log(`Project ${projectId} already loaded, skipping`);
-              return;
-            }
-          
-            this.selectedProject = projectId;
-            this.columns = [];
-            this.tasks = [];
-          
-            try {
-              const columnsResponse = await this.api_client.get(`/projects/${projectId}/columns/`);
-              this.columns = columnsResponse.data;
-              
-              for (const column of this.columns) {
-                try {
-                  const tasksResponse = await this.api_client.get(`/columns/${column.id}/tasks/`);
-                  // Фильтруем задачи, исключая выполненные и отклоненные
-                  const filteredTasks = tasksResponse.data.filter(task => 
-                    !task.completed && !task.rejected
-                  );
-                  this.tasks = [...this.tasks, ...filteredTasks];
-                } catch (error) {
-                  console.error(`Error loading tasks for column ${column.id}:`, error);
-                }
-              }
-            } catch (error) {
-              console.error('Error loading columns:', error);
-            }
-          },
-    
-        startAddingColumn() {
-          this.addingNewColumn = true;
-          this.newColumnName = '';
-          this.$nextTick(() => {
-            this.$refs.newColumnInput.focus();
-          });
-        },
+  
+      startAddingColumn() {
+        this.addingNewColumn = true;
+        this.newColumnName = '';
+        this.$nextTick(() => {
+          this.$refs.newColumnInput.focus();
+        });
+      },
+      
+      cancelAddingColumn() {
+        this.addingNewColumn = false;
+        this.newColumnName = '';
+      },
+      
+      async addColumn() {
+        const columnName = this.newColumnName.trim();
+        if (!columnName) {
+          alert('Название колонки не может быть пустым');
+          return;
+        }
         
-        cancelAddingColumn() {
+        try {
+          const response = await this.api_client.post('/columns/', {
+            name: columnName,
+            project: this.selectedProject,
+            order: this.columns.length
+          });
+          
+          this.columns.push({
+            id: response.data.id,
+            name: columnName,
+            order: this.columns.length,
+            project: this.selectedProject
+          });
+          
           this.addingNewColumn = false;
           this.newColumnName = '';
-        },
-        
-        async addColumn() {
-          const columnName = this.newColumnName.trim();
-          if (!columnName) {
-            alert('Название колонки не может быть пустым');
-            return;
-          }
+        } catch (error) {
+          console.error('Error creating column:', error);
+          alert('Не удалось создать колонку');
+        }
+      },
+
+      async removeColumn(columnId, columnIndex) {
+        if (!confirm('Вы уверены, что хотите удалить эту колонку? Все задачи в ней также будут удалены.')) {
+          return;
+        }
+
+        try {
+          await this.api_client.delete(`/columns/${columnId}/`);
           
-          try {
-            const response = await this.api_client.post('/columns/', {
-              name: columnName,
-              project: this.selectedProject,
-              order: this.columns.length
-            });
-            
-            this.columns.push({
-              id: response.data.id,
-              name: columnName,
-              order: this.columns.length,
-              project: this.selectedProject
-            });
-            
-            this.addingNewColumn = false;
-            this.newColumnName = '';
-          } catch (error) {
-            console.error('Error creating column:', error);
-            alert('Не удалось создать колонку');
-          }
-        },
-
-        async removeColumn(columnId, columnIndex) {
-          if (!confirm('Вы уверены, что хотите удалить эту колонку? Все задачи в ней также будут удалены.')) {
-            return;
-          }
-
-          try {
-            await this.api_client.delete(`/columns/${columnId}/`);
-            
-            // Удаляем задачи этой колонки
-            this.tasks = this.tasks.filter(t => t.column !== columnId);
-            
-            // Удаляем колонку из списка
-            this.columns.splice(columnIndex, 1);
-            
-            // Обновляем порядок оставшихся колонок
-            this.columns.forEach((col, idx) => {
-              col.order = idx;
-              this.api_client.patch(`/columns/${col.id}/`, { order: idx });
-            });
-          } catch (error) {
-            console.error('Error deleting column:', error);
-            alert('Не удалось удалить колонку');
-          }
-        },
-    
-        startEditColumn(index) {
-          this.editingColumnIndex = index;
-          this.$nextTick(() => {
-            const inputElement = document.getElementById('columnInput' + index);
-            if (inputElement) {
-              inputElement.focus();
-              inputElement.select();
-            }
+          // Удаляем задачи этой колонки
+          this.tasks = this.tasks.filter(t => t.column !== columnId);
+          
+          // Удаляем колонку из списка
+          this.columns.splice(columnIndex, 1);
+          
+          // Обновляем порядок оставшихся колонок
+          this.columns.forEach((col, idx) => {
+            col.order = idx;
+            this.api_client.patch(`/columns/${col.id}/`, { order: idx });
           });
-        },
-    
-        async saveColumnTitle(index) {
-          const newTitle = this.columns[index].name.trim();
-          if (!newTitle) return;
-    
-          const columnId = this.columns[index].id;
-    
-          try {
-            await this.api_client.patch(`/columns/${columnId}/`, { name: newTitle });
-            this.editingColumnIndex = null;
-          } catch (error) {
-            console.error('Error updating column:', error);
+        } catch (error) {
+          console.error('Error deleting column:', error);
+          alert('Не удалось удалить колонку');
+        }
+      },
+  
+      startEditColumn(index) {
+        this.editingColumnIndex = index;
+        this.$nextTick(() => {
+          const inputElement = document.getElementById('columnInput' + index);
+          if (inputElement) {
+            inputElement.focus();
+            inputElement.select();
           }
-        },
-    
-        async addTask(columnId) {
-          const taskName = this.newTaskName.trim();
-          if (!taskName) {
-            alert('Название задачи не может быть пустым');
-            return;
-          }
-    
-          try {
-            const response = await this.api_client.post('/tasks/', {
-              name: taskName,
-              column: columnId,
-            });
-    
-            this.tasks.push({
-              id: response.data.id,
-              name: taskName,
-              column: columnId,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-    
-            this.newTaskName = '';
-            this.newTaskColumn = null;
-          } catch (error) {
-            console.error('Error creating task:', error);
-            alert('Не удалось создать задачу');
-          }
-        },
-    
-        cancelNewTask() {
+        });
+      },
+  
+      async saveColumnTitle(index) {
+        const newTitle = this.columns[index].name.trim();
+        if (!newTitle) return;
+  
+        const columnId = this.columns[index].id;
+  
+        try {
+          await this.api_client.patch(`/columns/${columnId}/`, { name: newTitle });
+          this.editingColumnIndex = null;
+        } catch (error) {
+          console.error('Error updating column:', error);
+        }
+      },
+  
+      async addTask(columnId) {
+        const taskName = this.newTaskName.trim();
+        if (!taskName) {
+          alert('Название задачи не может быть пустым');
+          return;
+        }
+  
+        try {
+          const response = await this.api_client.post('/tasks/', {
+            name: taskName,
+            column: columnId,
+          });
+  
+          this.tasks.push({
+            id: response.data.id,
+            name: taskName,
+            column: columnId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+  
           this.newTaskName = '';
           this.newTaskColumn = null;
-        },
-    
-        showNewTaskInput(columnId) {
-          this.newTaskColumn = columnId;
-          this.newTaskName = '';
-          this.$nextTick(() => {
-            const inputElement = this.$refs['newTaskInput-' + columnId];
-            if (inputElement) {
-              inputElement.focus();
-            }
-          });
-        },
-    
-        startEditTask(taskId) {
-          this.editingTaskId = taskId;
-          this.$nextTick(() => {
-            const inputField = document.getElementById(`task-edit-${taskId}`);
-            if (inputField) {
-              inputField.focus();
-              inputField.select();
-            }
-          });
-        },
-    
-        async finishEditTask(task) {
-          if (task.name.trim() === '') {
-            await this.removeTask(task.id);
+        } catch (error) {
+          console.error('Error creating task:', error);
+          alert('Не удалось создать задачу');
+        }
+      },
+  
+      cancelNewTask() {
+        this.newTaskName = '';
+        this.newTaskColumn = null;
+      },
+  
+      showNewTaskInput(columnId) {
+        this.newTaskColumn = columnId;
+        this.newTaskName = '';
+        this.$nextTick(() => {
+          const inputElement = this.$refs['newTaskInput-' + columnId];
+          if (inputElement) {
+            inputElement.focus();
+          }
+        });
+      },
+  
+      startEditTask(taskId) {
+        this.editingTaskId = taskId;
+        this.$nextTick(() => {
+          const inputField = document.getElementById(`task-edit-${taskId}`);
+          if (inputField) {
+            inputField.focus();
+            inputField.select();
+          }
+        });
+      },
+  
+      async finishEditTask(task) {
+        if (task.name.trim() === '') {
+          await this.removeTask(task.id);
+          return;
+        }
+        
+        try {
+          await this.api_client.patch(`/tasks/${task.id}/`, { name: task.name });
+          this.editingTaskId = null;
+        } catch (error) {
+          console.error('Error updating task:', error);
+        }
+      },
+  
+      cancelEditTask() {
+        this.editingTaskId = null;
+      },
+  
+      async removeTask(taskId) {
+        try {
+          await this.api_client.delete(`/tasks/${taskId}/`);
+          this.tasks = this.tasks.filter(t => t.id !== taskId);
+        } catch (error) {
+          console.error('Error deleting task:', error);
+        }
+      },
+  
+      saveSettings() {
+        localStorage.setItem('KB-theme', JSON.stringify(this.colorSelected));
+        localStorage.setItem('KB-bannerImage', this.bannerImage);
+        this.showSettingsPage = false;
+      },
+  
+      onDragStart(event, taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (task && this.editingTaskId === taskId) {
+          event.preventDefault();
+          return false;
+        }
+        
+        event.dataTransfer.setData('text/plain', taskId);
+        event.target.classList.add('opacity-50');
+        event.dataTransfer.effectAllowed = 'move';
+      },
+      
+      onDragEnd(event) {
+        event.target.classList.remove('opacity-50');
+      },
+      
+      onDragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        return false;
+      },
+      
+      onDragEnter(event) {
+        if (event.currentTarget.classList.contains('dropzone')) {
+          event.currentTarget.classList.add('bg-gray-200');
+        }
+      },
+      
+      onDragLeave(event) {
+        if (event.currentTarget.classList.contains('dropzone')) {
+          event.currentTarget.classList.remove('bg-gray-200');
+        }
+      },
+  
+      async onDrop(event, columnId) {
+          event.stopPropagation();
+          event.preventDefault();
+          
+          const taskId = event.dataTransfer.getData('text/plain');
+          if (!taskId) {
+            console.error('No task ID found in the drag data');
             return;
           }
-          
+        
+          const task = this.tasks.find(t => t.id == taskId);
+          if (!task) {
+            console.error('Task not found:', taskId);
+            return;
+          }
+        
+          if (task.column === columnId) {
+            console.log('Task already in this column');
+            return;
+          }
+        
+          const originalColumnId = task.column;
+          task.column = columnId;
+          this.tasks = [...this.tasks];
+        
           try {
-            await this.api_client.patch(`/tasks/${task.id}/`, { name: task.name });
-            this.editingTaskId = null;
+            await this.api_client.patch(`/tasks/${taskId}/`, { 
+              column: columnId,
+              completed: false,  // Убедимся, что задача не помечена как выполненная
+              rejected: false    // или отклоненная при перемещении
+            });
           } catch (error) {
-            console.error('Error updating task:', error);
-          }
-        },
-    
-        cancelEditTask() {
-          this.editingTaskId = null;
-        },
-    
-        async removeTask(taskId) {
-          try {
-            await this.api_client.delete(`/tasks/${taskId}/`);
-            this.tasks = this.tasks.filter(t => t.id !== taskId);
-          } catch (error) {
-            console.error('Error deleting task:', error);
-          }
-        },
-    
-        saveSettings() {
-          localStorage.setItem('KB-theme', JSON.stringify(this.colorSelected));
-          localStorage.setItem('KB-bannerImage', this.bannerImage);
-          this.showSettingsPage = false;
-        },
-    
-        onDragStart(event, taskId) {
-          const task = this.tasks.find(t => t.id === taskId);
-          if (task && this.editingTaskId === taskId) {
-            event.preventDefault();
-            return false;
-          }
-          
-          event.dataTransfer.setData('text/plain', taskId);
-          event.target.classList.add('opacity-50');
-          event.dataTransfer.effectAllowed = 'move';
-        },
-        
-        onDragEnd(event) {
-          event.target.classList.remove('opacity-50');
-        },
-        
-        onDragOver(event) {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'move';
-          return false;
-        },
-        
-        onDragEnter(event) {
-          if (event.currentTarget.classList.contains('dropzone')) {
-            event.currentTarget.classList.add('bg-gray-200');
-          }
-        },
-        
-        onDragLeave(event) {
-          if (event.currentTarget.classList.contains('dropzone')) {
-            event.currentTarget.classList.remove('bg-gray-200');
-          }
-        },
-    
-        async onDrop(event, columnId) {
-            event.stopPropagation();
-            event.preventDefault();
-            
-            const taskId = event.dataTransfer.getData('text/plain');
-            if (!taskId) {
-              console.error('No task ID found in the drag data');
-              return;
-            }
-          
-            const task = this.tasks.find(t => t.id == taskId);
-            if (!task) {
-              console.error('Task not found:', taskId);
-              return;
-            }
-          
-            if (task.column === columnId) {
-              console.log('Task already in this column');
-              return;
-            }
-          
-            const originalColumnId = task.column;
-            task.column = columnId;
+            console.error('Error updating task:', error.response?.data || error.message);
+            task.column = originalColumnId;
             this.tasks = [...this.tasks];
-          
-            try {
-              await this.api_client.patch(`/tasks/${taskId}/`, { 
-                column: columnId,
-                completed: false,  // Убедимся, что задача не помечена как выполненная
-                rejected: false    // или отклоненная при перемещении
-              });
-            } catch (error) {
-              console.error('Error updating task:', error.response?.data || error.message);
-              task.column = originalColumnId;
-              this.tasks = [...this.tasks];
-            }
           }
-      }));
-    });
-  </script>
-</body>
+        }
+    }));
+  });
+</script>
 {% endblock %}

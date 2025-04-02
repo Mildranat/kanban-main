@@ -3,32 +3,6 @@
 Уведомления
 {% endblock %}
 {% block content %}
-<body class="antialiased sans-serif bg-gray-300">
-  <div class="flex">
-    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
-      <h2 class="text-xl font-bold">Меню</h2>
-      <ul class="mt-4">
-        <li class="mb-2">
-          <a href="/" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
-        </li>
-        <li class="mb-2">
-          <a href="/notifications" class="block px-4 py-2 rounded-lg bg-gray-700">Уведомления</a>
-        </li>
-        <li class="mb-2">
-          <a href="/organization" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
-        </li>
-      </ul>  
-      <h2 class="text-xl font-bold mt-6">Пространства</h2>
-      <ul class="mt-4">
-        {% for workspace in workspaces %}
-          <li class="mb-2">
-            <a href="{% url 'board:workspace' workspace.id %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">
-              {{ workspace.name }}
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
-    </nav>
     <div class="flex-1 p-8">
         <div class="bg-white rounded-lg shadow p-6">
           <div class="flex justify-between items-center mb-6">
