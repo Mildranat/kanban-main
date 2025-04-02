@@ -5,21 +5,19 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import redirect, render, get_object_or_404
 from .forms import NewUserForm
-from board.models import Notification, Project, Task, Workspace
+from board.models import MemberRating, Notification, OrganizationMember, Project, Task, Workspace
 from datetime import timedelta
 from django.utils import timezone
 
 @login_required
 def home(request):
     today = timezone.now().date()
-    
     # Подсчет выполненных задач за сегодня
     completed_tasks = Task.objects.filter(
         column__project__workspace__owner=request.user,
         completed=True,
         completed_at__date=today
     )
-    
     # Подсчет отклоненных задач за сегодня
     rejected_tasks = Task.objects.filter(
         column__project__workspace__owner=request.user,
@@ -29,12 +27,9 @@ def home(request):
     
     completed_tasks_count = completed_tasks.count()
     rejected_tasks_count = rejected_tasks.count()
-    
     # Последние выполненные задачи
     recent_completed_tasks = completed_tasks.order_by('-completed_at')[:3]
-    
     workspaces = Workspace.objects.filter(owner=request.user)
-    
     return render(request, 'index.html', {
         'completed_tasks_count': completed_tasks_count,
         'rejected_tasks_count': rejected_tasks_count,
@@ -106,6 +101,24 @@ def mark_all_read(request):
         Notification.objects.filter(user=request.user, read=False).update(read=True)
         messages.success(request, 'Все уведомления помечены как прочитанные')
     return redirect('board:notifications')
+
+@login_required
+def organization_view(request):
+    # Участники
+    members = OrganizationMember.objects.filter(organization=request.user).select_related('user')
+    
+    # Рейтинг (топ-10 за текущую неделю)
+    today = timezone.now().date()
+    start_of_week = today - timedelta(days=today.weekday())
+    top_members = (
+        MemberRating.objects.filter(date__gte=start_of_week)
+        .order_by('-points')[:10]
+    )
+    
+    return render(request, 'organization.html', {
+        'members': members,
+        'top_members': top_members,
+    })
 
 def register_request(request):
     if request.method == 'POST':

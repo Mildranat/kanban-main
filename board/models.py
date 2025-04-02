@@ -57,11 +57,14 @@ class Task(models.Model):
         verbose_name_plural = 'Задачи'
         
     def save(self, *args, **kwargs):
- 
         if self.completed and not self.completed_at:
             self.completed_at = timezone.now()
-        if self.rejected and not self.rejected_at:
-            self.rejected_at = timezone.now()
+            # Начисление очков за выполнение задачи
+            member = OrganizationMember.objects.get(user=self.column.project.workspace.owner)
+            MemberRating.objects.create(
+                member=member,
+                points=10  # Базовые очки за задачу
+            )
         super().save(*args, **kwargs)
         
 class Notification(models.Model):
@@ -69,7 +72,7 @@ class Notification(models.Model):
     type = models.CharField(max_length=20, choices=[
         ('task_completed', 'Задача выполнена'),
         ('task_assigned', 'Задача назначена'),
-        ('task_rejected', 'Задача отклонена')  # Добавляем новый тип
+        ('task_rejected', 'Задача отклонена')  
     ])
     message = models.TextField()
     read = models.BooleanField(default=False)
@@ -82,4 +85,25 @@ class Notification(models.Model):
         verbose_name_plural = 'Уведомления'
 
     def __str__(self):
-        return f"{self.get_type_display()} - {self.message[:50]}"   
+        return f"{self.get_type_display()} - {self.message[:50]}"
+    
+
+class OrganizationMember(models.Model):
+    user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
+    organization = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='members')  # Владелец как организация
+    role = models.CharField(max_length=50, choices=[
+        ('owner', 'Владелец'),
+        ('member', 'Сотрудник')
+    ], default='member')
+    last_activity = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"
+
+class MemberRating(models.Model):
+    member = models.ForeignKey(OrganizationMember, on_delete=models.CASCADE, related_name='ratings')
+    points = models.IntegerField(default=0)
+    date = models.DateField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-points']
