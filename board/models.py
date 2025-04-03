@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone  
+from django.utils.crypto import get_random_string
 
 class Workspace(models.Model):
     owner = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='workspaces')
@@ -89,13 +90,12 @@ class Notification(models.Model):
     
 
 class OrganizationMember(models.Model):
-    user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
-    organization = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name='members')  # Владелец как организация
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE)  # Измените на ForeignKey
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)  # Добавьте связь с пространством
     role = models.CharField(max_length=50, choices=[
         ('owner', 'Владелец'),
         ('member', 'Сотрудник')
     ], default='member')
-    last_activity = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.username} ({self.role})"
@@ -107,3 +107,16 @@ class MemberRating(models.Model):
 
     class Meta:
         ordering = ['-points']
+
+class WorkspaceInvite(models.Model):
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE)
+    email = models.EmailField()
+    token = models.CharField(max_length=50, unique=True)
+    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_accepted = models.BooleanField(default=False)
+    
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = get_random_string(32)
+        super().save(*args, **kwargs)

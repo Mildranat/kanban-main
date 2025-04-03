@@ -128,6 +128,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = reverse_lazy('board:login')
 
+
+# Настройки email для Yandex
+# Настройки email для Yandex
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.yandex.ru'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'denisenko.ljudmila@yandex.ru'  # Ваш полный email
+EMAIL_HOST_PASSWORD = 'phvckyphngyijzud'  # Пароль приложения, который вы только что создали
+DEFAULT_FROM_EMAIL = 'denisenko.ljudmila@yandex.ru'  # Должен совпадать с EMAIL_HOST_USER
+SERVER_EMAIL = 'denisenko.ljudmila@yandex.ru'
+
+# URL вашего сайта
+SITE_URL = 'http://127.0.0.1:8000'  # Для разработки
+
 try:
     from .local_settings import *
 except ImportError:
