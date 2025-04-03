@@ -49,71 +49,93 @@
   </style>
 </head>
 <body class="antialiased sans-serif bg-gray-300">
-  <div class="flex">
-    <!-- Навигационное меню -->
-    <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
-      <h2 class="text-xl font-bold">Меню</h2>
-      <ul class="mt-4">
-        <li class="mb-2">
-          <a href="{% url 'board:home' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Главная</a>
-        </li>
-        <li class="mb-2">
-          <a href="{% url 'board:notifications' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Уведомления</a>
-        </li>
-        <li class="mb-2">
-          <a href="{% url 'board:organization' %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">Моя организация</a>
-        </li>
-      </ul>  
-      
-      <h2 class="text-xl font-bold mt-6">Пространства</h2>
-      <ul class="mt-4">
-        <li class="mb-2">
-          <button onclick="openWorkspaceModal()" class="w-full text-left px-4 py-2 rounded-lg hover:bg-gray-700 bg-green-600 hover:bg-green-700">
-            + Добавить пространство
-          </button>
-        </li>
-        {% for workspace in workspaces %}
+  {% if user.is_authenticated %}
+    <div class="flex">
+      <!-- Навигационное меню (только для авторизованных) -->
+      <nav class="w-64 min-h-screen bg-gray-800 text-white px-4 py-6">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">Меню</h2>
+          <a href="{% url 'board:logout' %}" 
+             class="text-sm bg-red-600 hover:bg-red-700 px-3 py-1 rounded-lg transition-colors"
+             title="Выйти из аккаунта">
+            Выйти
+          </a>
+        </div>
+        
+        <ul class="mt-4">
           <li class="mb-2">
-            <a href="{% url 'board:workspace' workspace.id %}" class="block px-4 py-2 rounded-lg hover:bg-gray-700">
-              {{ workspace.name }}
+            <a href="{% url 'board:home' %}" class="flex items-center px-4 py-2 rounded-lg hover:bg-gray-700">
+              <i class="uil uil-estate mr-2"></i> Главная
             </a>
           </li>
-        {% endfor %}
-      </ul>
-    </nav>
+          <li class="mb-2">
+            <a href="{% url 'board:notifications' %}" class="flex items-center px-4 py-2 rounded-lg hover:bg-gray-700">
+              <i class="uil uil-bell mr-2"></i> Уведомления
+            </a>
+          </li>
+          <li class="mb-2">
+            <a href="{% url 'board:organization' %}" class="flex items-center px-4 py-2 rounded-lg hover:bg-gray-700">
+              <i class="uil uil-users-alt mr-2"></i> Моя организация
+            </a>
+          </li>
+        </ul>  
+        
+        <h2 class="text-xl font-bold mt-6">Пространства</h2>
+        <ul class="mt-4">
+          <li class="mb-2">
+            <button onclick="openWorkspaceModal()" class="w-full flex items-center text-left px-4 py-2 rounded-lg hover:bg-gray-700 bg-green-600 hover:bg-green-700">
+              <i class="uil uil-plus mr-2"></i> Добавить пространство
+            </button>
+          </li>
+          {% for workspace in workspaces %}
+            <li class="mb-2">
+              <a href="{% url 'board:workspace' workspace.id %}" class="flex items-center px-4 py-2 rounded-lg hover:bg-gray-700">
+                <i class="uil uil-apps mr-2"></i> {{ workspace.name }}
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </nav>
 
-    <!-- Основной контент -->
-    <div class="flex-1 p-8">
-      {% block content %}{% endblock %}
+      <!-- Основной контент -->
+      <div class="flex-1 p-8">
+        {% block content %}{% endblock %}
+      </div>
     </div>
-  </div>
-<!-- Модальное окно для создания пространства -->
-<div id="workspaceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-  <div class="bg-white rounded-lg p-6 w-96">
-    <h3 class="text-xl font-bold mb-4">Создать новое пространство</h3>
-    <form id="workspaceForm" method="post" action="{% url 'board:create_workspace' %}">
-      {% csrf_token %}
-      <div class="mb-4">
-        <label class="block text-gray-700 mb-2" for="workspaceName">Название пространства</label>
-        <input type="text" id="workspaceName" name="name" required
-               class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+
+    <!-- Модальное окно для создания пространства -->
+    <div id="workspaceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-lg p-6 w-96">
+        <h3 class="text-xl font-bold mb-4">Создать новое пространство</h3>
+        <form id="workspaceForm" method="post" action="{% url 'board:create_workspace' %}">
+          {% csrf_token %}
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-2" for="workspaceName">Название пространства</label>
+            <input type="text" id="workspaceName" name="name" required
+                   class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+          <div class="flex justify-end">
+            <button type="button" onclick="closeWorkspaceModal()" 
+                    class="px-4 py-2 mr-2 bg-gray-300 rounded-lg hover:bg-gray-400">
+              Отмена
+            </button>
+            <button type="submit" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              Создать
+            </button>
+          </div>
+        </form>
       </div>
-      <div class="flex justify-end">
-        <button type="button" onclick="closeWorkspaceModal()" 
-                class="px-4 py-2 mr-2 bg-gray-300 rounded-lg hover:bg-gray-400">
-          Отмена
-        </button>
-        <button type="submit" 
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          Создать
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+    </div>
+  {% else %}
+    <!-- Контент для неавторизованных пользователей -->
+    {% block auth_content %}{% endblock %}
+  {% endif %}
+
   <!-- Скрипты -->
   <script defer src="https://unpkg.com/alpinejs@3.12.0/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
+  {% if user.is_authenticated %}
   <script>
     function openWorkspaceModal() {
       document.getElementById('workspaceModal').classList.remove('hidden');
@@ -149,5 +171,6 @@
       });
     });
   </script>
+  {% endif %}
 </body>
 </html>
